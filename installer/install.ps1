@@ -168,7 +168,7 @@ foreach ($shortcutPath in @($startMenu, $desktop)) {
   } elseif ($chromePath) {
     $shortcut.IconLocation = "$chromePath,0"
   }
-  $shortcut.Description = "nello-claw - your AI executive assistant"
+  $shortcut.Description = "nello-claw - your AI Chief Operations Officer"
   $shortcut.Save()
 }
 Ok "shortcuts created (Start Menu + Desktop)"

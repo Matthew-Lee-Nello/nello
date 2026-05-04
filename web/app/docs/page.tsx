@@ -5,7 +5,7 @@ export default function Docs() {
     <div className="hero">
       <h1>How it works</h1>
       <p style={{ fontSize: 18, color: 'var(--text)' }}>
-        nello-claw is your own AI executive assistant. They live on your Mac, know everything
+        nello-claw is your own AI Chief Operations Officer. They live on your Mac, know everything
         you tell them, and just do the work.
       </p>
       <p>
