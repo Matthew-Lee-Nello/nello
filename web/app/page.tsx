@@ -15,12 +15,11 @@ export default function Landing() {
 
       <ul style={{ paddingLeft: 20, lineHeight: 1.9, color: 'var(--text)', marginTop: 24 }}>
         <li>Reads and writes your Gmail, Drive, Docs, Calendar (Google Workspace)</li>
-        <li>Reads and writes your second brain (Obsidian vault)</li>
+        <li>Reads and writes your second brain + permanent memory (Obsidian vault)</li>
         <li>Researches the live web (Exa)</li>
         <li>Texts you from anywhere via Telegram, voice or text</li>
         <li>Remembers your projects, clients, decisions, preferences forever</li>
-        <li>Runs your morning briefing while you sleep</li>
-        <li>Picks up your writing style and matches it</li>
+        <li>Runs custom scheduled tasks, to-dos and morning briefs while you sleep</li>
         <li>Plays a sound when it finishes a task so you can multitask while it works</li>
       </ul>
 
