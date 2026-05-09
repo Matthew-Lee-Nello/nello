@@ -10,8 +10,13 @@ const figtree = Figtree({
 })
 
 export const metadata: Metadata = {
-  title: 'nello-claw - Your AI Chief Operations Officer',
-  description: 'An AI Chief Operations Officer who knows everything about you, runs on your Mac, and just does the work. Setup takes 10 minutes. Your keys stay on your machine.',
+  title: 'NELLO Labs - Your AI Chief Operations Officer',
+  description: 'An AI Chief Operations Officer who knows everything about you, runs on your Mac, and just does the work. Setup takes 10 minutes. Your keys stay on your machine. Built on the nello-claw workspace.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/logo.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

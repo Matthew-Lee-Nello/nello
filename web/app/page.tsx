@@ -1,11 +1,23 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 export default function Landing() {
   return (
     <div className="hero">
-      <h1><span>nello-claw</span></h1>
+      <Image
+        src="/logo.png"
+        alt="NELLO Labs"
+        width={96}
+        height={96}
+        priority
+        style={{ marginBottom: 16 }}
+      />
+      <h1>Your <span>AI Chief Operations Officer</span></h1>
+      <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 20, marginTop: -8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        Built on the nello-claw workspace
+      </p>
       <p style={{ fontSize: 24, color: 'var(--text)', marginBottom: 16, lineHeight: 1.3 }}>
-        Your executive AI assistant. One that knows everything about you, and just does the job.
+        Knows everything about you, and just does the job.
       </p>
       <p>
         Answer a few questions. Connect your accounts. Get an assistant that handles your
