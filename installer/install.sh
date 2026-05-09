@@ -132,8 +132,12 @@ else
 fi
 ok "template ready"
 
-# 7. Copy bundle into place
-cp "$BUNDLE_PATH" "$INSTALL_PATH/bundle.json"
+# 7. Copy bundle into place (skip if source and destination are the same file - BSD cp returns
+# non-zero with `set -e` otherwise, killing the install for anyone whose bundle already lives in
+# the install dir).
+if [ "$BUNDLE_PATH" != "$INSTALL_PATH/bundle.json" ]; then
+  cp "$BUNDLE_PATH" "$INSTALL_PATH/bundle.json"
+fi
 
 # 8. Install deps + build
 cd "$INSTALL_PATH"
