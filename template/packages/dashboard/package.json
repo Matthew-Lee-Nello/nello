@@ -21,13 +21,14 @@
   "dependencies": {
     "@nc/core": "workspace:*",
     "@nc/scheduler": "workspace:*",
-    "express": "^4.19.2",
     "cors": "^2.8.5",
-    "ws": "^8.18.0",
+    "express": "^4.19.2",
     "multer": "^1.4.5-lts.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-markdown": "^9.0.1"
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

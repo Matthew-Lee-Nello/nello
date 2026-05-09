@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Icon } from '../components/Icon'
 
 interface ChatRow {
@@ -547,7 +548,7 @@ export default function Chat() {
               <div>
                 <div className="bubble">
                   {m.role === 'assistant'
-                    ? <ReactMarkdown>{m.content}</ReactMarkdown>
+                    ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
                     : m.content}
                 </div>
                 <div className="meta">{m.role === 'user' ? 'you' : 'Luke'}</div>
@@ -561,7 +562,7 @@ export default function Chat() {
               <div className="avatar sm">L</div>
               <div>
                 <div className="bubble">
-                  <ReactMarkdown>{streaming}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{streaming}</ReactMarkdown>
                 </div>
                 <div className="meta">Luke · streaming…</div>
               </div>
