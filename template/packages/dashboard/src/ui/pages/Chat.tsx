@@ -105,6 +105,14 @@ export default function Chat() {
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data)
+        // 'rename' applies to the chat in the message envelope regardless of
+        // which chat is active — the sidebar should re-label even if the user
+        // has switched away by the time the title comes back from Haiku.
+        if (msg.type === 'rename' && msg.data?.name && msg.chatId) {
+          const newName = String(msg.data.name)
+          setChats(prev => prev.map(c => c.id === msg.chatId ? { ...c, name: newName } : c))
+          return
+        }
         if (msg.chatId !== activeId) return
         if (msg.type === 'thinking') {
           setBusy(true)
