@@ -17,6 +17,8 @@ The actual install steps:
 
 Before running the bootstrap, summarise everything it will change on my system and let me approve. The bootstrap prints its own change summary too.
 
+After the bootstrap finishes, tell me to run /nello-start in this same terminal to begin onboarding - that skill walks me through what's been set up and hands off to /nello-build for wiring my first features.
+
 Adapt the commands for my OS (Mac/Windows/Linux). Ask me before any destructive operation.`
 
 const MAC_FALLBACK = 'curl -fsSL https://labs.nello.gg/i/mac | bash'

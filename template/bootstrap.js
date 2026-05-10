@@ -596,9 +596,9 @@ async function main() {
   if (chatId) console.log(`  • Telegram bot linked to chat ${chatId}`)
   console.log(`  • ${skillCount} skills, ${mcpCount} MCP servers\n`)
   console.log(`${ACCENT}Next:${RESET}`)
-  console.log(`  1. Open the dashboard above`)
-  console.log(`  2. Click "Chat" and talk to Claude`)
-  console.log(`  3. Ask him what's been set up — he knows\n`)
+  console.log(`  1. ${ACCENT}Run /nello-start${RESET} in this terminal (or in the dashboard chat) to begin onboarding`)
+  console.log(`  2. Open the dashboard above and message your AI COO`)
+  console.log(`  3. Stuck? Run /install-doctor for a full audit of what's wired\n`)
 }
 
 function readDashboardUrl() {
