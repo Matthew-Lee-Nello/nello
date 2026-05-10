@@ -270,6 +270,18 @@ export default function Chat() {
     e.target.value = ''
   }, [uploadFiles])
 
+  const onPaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData?.items ?? [])
+    const files = items
+      .filter(it => it.kind === 'file')
+      .map(it => it.getAsFile())
+      .filter((f): f is File => f !== null)
+    if (files.length > 0) {
+      e.preventDefault()
+      uploadFiles(files)
+    }
+  }, [uploadFiles])
+
   // ---- Send -----
   const send = async () => {
     const text = input.trim()
@@ -659,7 +671,8 @@ export default function Chat() {
               value={input}
               onChange={e => onInputChange(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={busy ? 'thinking…' : (uploading ? 'uploading…' : 'Reply to Luke… (drag-drop files, type / for commands)')}
+              onPaste={onPaste}
+              placeholder={busy ? 'thinking…' : (uploading ? 'uploading…' : 'Reply to Luke… (drag-drop or paste files, type / for commands)')}
               disabled={busy || !activeId}
             />
             <div className="composer-row">
