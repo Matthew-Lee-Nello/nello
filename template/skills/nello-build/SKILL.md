@@ -101,30 +101,42 @@ Watch your inbox sort itself. Approve the drafts that look right. **You handle u
 
 `[x] 1. Four-bucket Gmail filter`
 
-### Section 2 - Obsidian as your second brain (with wikilinks)
+### Section 2 - Your dashboard at localhost:3000 + Obsidian as your second brain
 
-Obsidian is already installed (the bundle did that for you). Open it. Your vault is the folder the install put on your machine. The assistant reads everything in there before answering anything.
+**First, the dashboard.** Open your browser to `http://localhost:3000`. That's your AI COO's chat window. It runs on your own machine - your messages never leave your computer except to talk to Claude. From here you can:
 
-**Anything you'd want to reference later goes in this vault.** Meeting transcripts, decisions, half-baked ideas, voice notes, client briefs.
+- Chat with your assistant (sidebar on the left, message box on the right)
+- Drop files in by drag-and-drop or by clicking the paperclip
+- Watch it work in real time (it streams its replies + shows what tools it's using)
 
-**2.1. Drop a meeting transcript.**
+You don't need to open Obsidian directly to use the second brain. **Your assistant writes to it for you.** You paste content into the chat, the assistant saves it to the right place in the vault, with the right name.
 
-Pick any recent meeting transcript you have. Otterai, Fathom, Zoom recap, doesn't matter. In Obsidian: **New note**, name it `Log-meeting-with-<person>-<date>`, paste, save.
+**2.1. Drop a meeting transcript into the chat.**
 
-Now ask your AI COO: "what did we agree on in the meeting with `<person>`?". It pulls the answer straight from the note.
+Pick any recent meeting transcript you have. Otterai, Fathom, Zoom recap, doesn't matter.
 
-**2.2. Wikilinks - this is the move.**
-
-Inside any Obsidian note, type `[[` and Obsidian shows a list of every other note in your vault. Pick one. The link saves like this: `[[Log-meeting-with-Sarah-2026-05-12]]`. Click it later and Obsidian opens that note.
-
-Why it matters: your vault becomes a graph instead of a pile. Notes link to people, people link to deals, deals link to meetings, meetings link to action items. The assistant reads the links and follows them when answering. You stop losing context.
-
-**2.3. Naming convention.**
-
-The vault uses prefixes so things stay findable:
+In the dashboard chat, paste the whole transcript with a one-line lead in:
 
 ```
-  Log-       quick captures, meeting notes, journal-style entries
+Save this meeting with Sarah on 2026-05-12 to my vault.
+
+<paste the full transcript here>
+```
+
+The assistant creates a note like `Log-meeting-with-Sarah-2026-05-12.md` in your vault, links it to `[[Person-Sarah]]` if Sarah's already in there, and pulls out any action items. Now ask: "what did we agree on with Sarah?" - it answers from the note.
+
+**2.2. Why the wikilinks matter.**
+
+The assistant uses Obsidian-style `[[wikilinks]]` to connect your notes. People link to meetings, meetings link to deals, deals link to action items. Your vault becomes a graph, not a pile. When you ask "what's happening with Springwood", it follows the links across notes to give you a real answer instead of a one-note search hit.
+
+You don't have to type `[[` brackets yourself - the assistant does it. Just keep mentioning the same names ("Sarah", "Springwood", "Big Plus Property") in your chat messages and it figures out the links.
+
+**2.3. Naming convention the assistant follows.**
+
+Whenever the assistant writes to your vault, it uses a prefix so things stay findable:
+
+```
+  Log-       meeting notes, call recaps, journal-style captures
   Project-   anything with a goal and a deadline
   Person-    people in your network (clients, prospects, staff)
   Client-    active paying clients
@@ -132,9 +144,9 @@ The vault uses prefixes so things stay findable:
   Idea-      raw ideas, hypotheses
 ```
 
-Match the prefix when you create notes manually and your vault stays clean. The assistant follows the same convention.
+If you ever want to see what's in there, **Obsidian.app is already installed and pre-configured** - open it from your `/Applications` folder, the vault loads automatically. Use it as a viewer; the assistant does the writing.
 
-`[x] 2. Obsidian + wikilinks`
+`[x] 2. Dashboard + Obsidian as second brain`
 
 ### Section 3 - MCPs in Telegram (real use cases)
 
