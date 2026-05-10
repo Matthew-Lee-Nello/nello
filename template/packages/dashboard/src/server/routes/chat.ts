@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import multer from 'multer'
+import { query } from '@anthropic-ai/claude-agent-sdk'
 import {
   getDb, getSession, setSession, clearSession,
   buildMemoryContext, saveConversationTurn, runAgentStream,
@@ -20,6 +21,78 @@ interface DashboardChat {
 }
 
 const UPLOADS_ROOT = join(STORE_DIR, 'uploads')
+
+// Default chat names produced by the dashboard - frontend creates 'New chat' /
+// 'Dashboard'; server POST also defaults to 'New chat'. Anything that doesn't
+// match is treated as user-customised and left alone by the auto-namer.
+const DEFAULT_CHAT_NAME_RE = /^(?:New chat|New Chat|Dashboard)$/
+
+/**
+ * Generate a 3 to 6 word chat title from the user's first message.
+ * Uses claude-agent-sdk with Haiku for a cheap, fast one-shot - no MCPs, no
+ * setting sources, no tool loop. Goes through the same Claude Code OAuth as
+ * the rest of the daemon (no API key, no per-token billing).
+ *
+ * Failure mode: returns empty string. Caller no-ops, chat keeps default name.
+ */
+async function generateChatTitle(firstMessage: string): Promise<string> {
+  const trimmed = firstMessage.trim().slice(0, 600)
+  const prompt = `Summarise this user message as a 3 to 6 word chat title. No quotes, no period, no "Chat:" prefix, no markdown. Just the bare title text.
+
+Message: ${trimmed}
+
+Title:`
+
+  let title = ''
+  const generator = query({
+    prompt,
+    options: {
+      model: 'claude-haiku-4-5',
+      permissionMode: 'bypassPermissions',
+    },
+  })
+
+  for await (const event of generator) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const e = event as any
+    if (e.type === 'assistant') {
+      const blocks = e.message?.content ?? []
+      for (const block of blocks) {
+        if (block.type === 'text' && block.text) title += block.text
+      }
+    } else if (e.type === 'result' && typeof e.result === 'string') {
+      title = e.result
+    }
+  }
+
+  return title
+    .trim()
+    .replace(/^["'`]+|["'`.!?]+$/g, '')
+    .slice(0, 60)
+    .trim()
+}
+
+/**
+ * Auto-rename a chat from a default name based on the user's first message.
+ * Fire-and-forget: no-op on user-customised names, swallows errors so failure
+ * never blocks the actual chat response. Broadcasts a WS 'rename' event so
+ * the sidebar updates without a refresh.
+ */
+function maybeAutoNameChat(chatId: string, currentName: string, firstMessage: string): void {
+  if (!DEFAULT_CHAT_NAME_RE.test(currentName)) return
+  generateChatTitle(firstMessage)
+    .then(title => {
+      if (!title || DEFAULT_CHAT_NAME_RE.test(title)) return
+      const result = getDb()
+        .prepare('UPDATE dashboard_chats SET name = ?, updated_at = ? WHERE id = ?')
+        .run(title, Date.now(), chatId)
+      if (result.changes > 0) {
+        sendToChat(chatId, 'rename', { name: title })
+        logger.info({ chatId, title }, 'Auto-named chat')
+      }
+    })
+    .catch(err => logger.debug({ err, chatId }, 'Chat title generation failed (non-fatal)'))
+}
 
 // Per-chat upload directory; multer's diskStorage handler creates it on first use.
 const upload = multer({
@@ -115,13 +188,17 @@ export function chatRouter(): Router {
     const text: string = req.body?.text ?? ''
     if (!text.trim()) { res.status(400).json({ error: 'empty message' }); return }
 
-    const chatRow = getDb().prepare('SELECT id FROM dashboard_chats WHERE id = ? AND archived_at IS NULL').get(chatId) as { id: string } | undefined
+    const chatRow = getDb().prepare('SELECT id, name FROM dashboard_chats WHERE id = ? AND archived_at IS NULL').get(chatId) as { id: string; name: string } | undefined
     if (!chatRow) { res.status(404).json({ error: `chat not found: ${chatId}. POST /api/chat first to create one.` }); return }
 
     const now = Date.now()
     getDb().prepare('INSERT INTO dashboard_messages (chat_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(chatId, 'user', text, now)
     sendToChat(chatId, 'user_message', { text, ts: now })
     sendToChat(chatId, 'thinking', { text: 'thinking…' })
+
+    // Auto-name fresh chats from their first user message. Fire-and-forget so
+    // we don't block the assistant stream below.
+    maybeAutoNameChat(chatId, chatRow.name, text)
 
     try {
       const memContext = await buildMemoryContext(chatId, text)
