@@ -1,17 +1,8 @@
-import Image from 'next/image'
 import Link from 'next/link'
 
 export default function Landing() {
   return (
     <div className="hero">
-      <Image
-        src="/logo.png"
-        alt="NELLO Labs"
-        width={96}
-        height={96}
-        priority
-        style={{ marginBottom: 16 }}
-      />
       <h1>Your <span>AI Chief Operations Officer</span></h1>
       <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 20, marginTop: -8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         Built on the nello-claw workspace
