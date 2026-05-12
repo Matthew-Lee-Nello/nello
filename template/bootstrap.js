@@ -662,6 +662,7 @@ async function main() {
   console.log(`  • ${skillCount} skills, ${mcpCount} MCP servers\n`)
   console.log(`${ACCENT}Next:${RESET}`)
   console.log(`  1. ${ACCENT}Run /nello-start${RESET} in this terminal (or in the dashboard chat) to begin onboarding`)
+  console.log(`     ${DIM}If you don't see it, start a new chat. If you still don't, ask Claude to run it.${RESET}`)
   console.log(`  2. Open the dashboard above and message your AI COO`)
   console.log(`  3. Stuck? Run /install-doctor for a full audit of what's wired\n`)
 }
