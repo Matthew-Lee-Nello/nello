@@ -34,6 +34,15 @@ export default function HeroAscii() {
       <div className="absolute bottom-0 left-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-l-2 border-[var(--ink)]/25 z-20" />
       <div className="absolute bottom-0 right-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-r-2 border-[var(--ink)]/25 z-20" />
 
+      {/* Byline — bottom-left */}
+      <div className="absolute bottom-5 left-16 lg:bottom-6 lg:left-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
+        meticulously crafted by{' '}
+        <span className="font-serif italic text-[var(--ink)] text-[13px] lg:text-[15px] tracking-normal">
+          Matthew Lee
+        </span>
+        {' '}<span className="text-[var(--ink)]/60">@</span> NELLO LABS
+      </div>
+
       {/* Hero — content + mark, centred together as one group */}
       <div className="relative z-10 flex min-h-screen items-center justify-center px-6 lg:px-12">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
