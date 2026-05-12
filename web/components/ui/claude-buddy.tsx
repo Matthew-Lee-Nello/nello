@@ -1,26 +1,38 @@
 /**
  * ClaudeBuddy — Claude Code mascot.
- * Static webp asset shown with a subtle idle scale-pulse.
+ *
+ * Static body (image), animated eyes (overlay rectangles that shift
+ * left-right on a slow loop). The source webp has white eye holes which
+ * mix-blend-mode: multiply turns transparent on cream; the overlay fills
+ * them with ink and adds the only motion on the sprite.
  */
 'use client'
 
 interface ClaudeBuddyProps {
   size?: number
   className?: string
+  animateEyes?: boolean
 }
 
-export function ClaudeBuddy({ size = 180, className }: ClaudeBuddyProps) {
+export function ClaudeBuddy({
+  size = 240,
+  className,
+  animateEyes = true,
+}: ClaudeBuddyProps) {
   return (
-    <>
+    <div
+      aria-hidden="true"
+      className={`relative select-none ${className ?? ''}`}
+      style={{ width: size, height: size }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/buddies/claude-code-mascot.webp"
         alt=""
-        aria-hidden="true"
         draggable={false}
         width={size}
         height={size}
-        className={`claude-buddy-img select-none ${className ?? ''}`}
+        className="block"
         style={{
           width: size,
           height: size,
@@ -28,20 +40,49 @@ export function ClaudeBuddy({ size = 180, className }: ClaudeBuddyProps) {
           mixBlendMode: 'multiply',
         }}
       />
+
+      {/* Eye overlay — sits inside the white eye holes of the source image */}
+      <div
+        className={`absolute inset-0 pointer-events-none ${animateEyes ? 'claude-buddy-eyes' : ''}`}
+      >
+        {/* Left eye */}
+        <div
+          className="absolute"
+          style={{
+            left: '31.5%',
+            top: '31%',
+            width: '7%',
+            height: '14%',
+            background: '#14110E',
+          }}
+        />
+        {/* Right eye */}
+        <div
+          className="absolute"
+          style={{
+            left: '61.5%',
+            top: '31%',
+            width: '7%',
+            height: '14%',
+            background: '#14110E',
+          }}
+        />
+      </div>
+
       <style jsx>{`
-        @keyframes claude-buddy-breathe {
-          0%, 100% { transform: scale(1);    opacity: 0.95; }
-          50%      { transform: scale(1.06); opacity: 1;    }
+        @keyframes claude-eye-look {
+          0%, 18%, 100%   { transform: translateX(0); }
+          28%, 42%        { transform: translateX(-2.5%); }
+          55%, 70%        { transform: translateX(2.5%); }
+          82%             { transform: translateX(0); }
         }
-        :global(.claude-buddy-img) {
-          animation: claude-buddy-breathe 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-          transform-origin: center;
-          will-change: transform, opacity;
+        :global(.claude-buddy-eyes) {
+          animation: claude-eye-look 5s ease-in-out infinite;
         }
         @media (prefers-reduced-motion: reduce) {
-          :global(.claude-buddy-img) { animation: none; }
+          :global(.claude-buddy-eyes) { animation: none; }
         }
       `}</style>
-    </>
+    </div>
   )
 }

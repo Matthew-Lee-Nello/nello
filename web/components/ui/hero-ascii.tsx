@@ -132,15 +132,12 @@ export default function HeroAscii() {
             </div>
           </div>
 
-          {/* Claude mark + little buddy stacked */}
-          <div className="flex flex-col items-center gap-5 shrink-0">
-            <ClaudeMark size={280} />
-            <div className="flex flex-col items-center gap-2">
-              <ClaudeBuddy size={200} />
-              <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
-                <span className="w-1 h-1 rounded-full bg-[#16a34a] animate-pulse" />
-                CLAUDE CODE · ONLINE
-              </div>
+          {/* Claude Code mascot — takes the spot the orange mark used to hold */}
+          <div className="flex flex-col items-center gap-3 shrink-0">
+            <ClaudeBuddy size={300} />
+            <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
+              <span className="w-1 h-1 rounded-full bg-[#16a34a] animate-pulse" />
+              CLAUDE CODE · ONLINE
             </div>
           </div>
         </div>
