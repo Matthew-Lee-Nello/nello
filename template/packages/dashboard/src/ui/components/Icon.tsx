@@ -9,7 +9,7 @@ export type IconName =
   | 'archive' | 'calendar' | 'alert' | 'info' | 'chevron-right'
   | 'chevron-down' | 'more' | 'command' | 'zap' | 'cpu' | 'memory'
   | 'telegram' | 'filter' | 'save' | 'tag' | 'sparkle'
-  | 'power'
+  | 'power' | 'sun' | 'moon'
 
 interface Props {
   name: IconName
@@ -70,6 +70,8 @@ export const Icon: React.FC<Props> = ({ name, size = 14, className, style }) => 
     case 'tag': return (<svg {...p}><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>)
     case 'sparkle': return (<svg {...p}><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>)
     case 'power': return (<svg {...p}><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>)
+    case 'sun': return (<svg {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>)
+    case 'moon': return (<svg {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>)
     default: return null
   }
 }

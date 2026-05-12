@@ -5,6 +5,7 @@ import Monitoring from './pages/Monitoring'
 import Memory from './pages/Memory'
 import DaemonStatus from './components/DaemonStatus'
 import { Icon, type IconName } from './components/Icon'
+import { ThemeToggle } from './components/ThemeToggle'
 
 type Page = 'monitoring' | 'chat' | 'memory' | 'schedules'
 
@@ -84,6 +85,8 @@ export default function App() {
             fontFamily: 'var(--font-mono)',
             color: 'var(--muted)',
             borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
           }}
           title={wsConnected ? 'Live socket connected' : 'Socket disconnected'}
         >
@@ -96,7 +99,8 @@ export default function App() {
               verticalAlign: 'middle',
             }}
           />
-          ws · {wsConnected ? 'live' : 'down'}
+          <span>ws · {wsConnected ? 'live' : 'down'}</span>
+          <ThemeToggle />
         </div>
 
         <div className="sb-section-label">Workspace</div>
