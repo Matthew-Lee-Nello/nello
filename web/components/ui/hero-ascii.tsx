@@ -133,15 +133,13 @@ export default function HeroAscii() {
           </div>
 
           {/* Claude mark + little buddy stacked */}
-          <div className="flex flex-col items-center gap-4 shrink-0">
+          <div className="flex flex-col items-center gap-5 shrink-0">
             <ClaudeMark size={280} />
-            <div className="relative">
-              <div className="rounded-[6px] overflow-hidden border border-[var(--ink)]/25 shadow-[0_2px_24px_-8px_rgba(20,17,14,0.25)]">
-                <ClaudeBuddy state="idle" size={168} />
-              </div>
-              <div className="mt-2 flex items-center justify-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
+            <div className="flex flex-col items-center gap-2">
+              <ClaudeBuddy size={216} frameMs={440} />
+              <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
                 <span className="w-1 h-1 rounded-full bg-[#16a34a] animate-pulse" />
-                BUFO · IDLE
+                CHONK · IDLE
               </div>
             </div>
           </div>
