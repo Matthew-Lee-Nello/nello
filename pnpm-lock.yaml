@@ -112,6 +112,9 @@ importers:
 
   template/packages/dashboard:
     dependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: ^0.1.0
+        version: 0.1.77(zod@4.3.6)
       '@nc/core':
         specifier: workspace:*
         version: link:../core

@@ -16,7 +16,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, copyFileSync, readdirSync, chmodSync, renameSync } from 'node:fs'
-import { join, dirname, basename } from 'node:path'
+import { join, dirname, basename, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 import { execSync, spawnSync } from 'node:child_process'
@@ -363,16 +363,26 @@ function installObsidianApp() {
       execSync('winget install --silent --accept-source-agreements --accept-package-agreements Obsidian.Obsidian', { stdio: 'pipe' })
       if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via winget'); _obsidianInstalled = true; return }
     } catch {}
-    // Fallback - download installer + run silently
+    // Fallback - resolve latest installer asset via GitHub Releases API then download.
+    // Earlier versions of this script hit a hardcoded URL that 404'd because Obsidian
+    // ships versioned filenames (e.g. Obsidian-1.5.12.exe), not a stable Obsidian.exe.
     try {
       const installer = join(process.env.TEMP || process.env.LOCALAPPDATA || '.', 'Obsidian-installer.exe')
-      info('Downloading Obsidian installer (winget unavailable)...')
-      execSync(`powershell -NoProfile -Command "irm https://obsidian.md/download | Out-Null; Invoke-WebRequest -Uri 'https://github.com/obsidianmd/obsidian-releases/releases/latest/download/Obsidian.exe' -OutFile '${installer}'"`, { stdio: 'pipe' })
+      info('Resolving latest Obsidian installer (winget unavailable)...')
+      const ps = [
+        "$ErrorActionPreference='Stop'",
+        "$rel = Invoke-RestMethod 'https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest'",
+        "$asset = $rel.assets | Where-Object { $_.name -match '^Obsidian-\\d+\\.\\d+\\.\\d+\\.exe$' } | Select-Object -First 1",
+        "if (-not $asset) { throw 'no matching installer in latest release' }",
+        `Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '${installer}'`,
+      ].join('; ')
+      execSync(`powershell -NoProfile -Command "${ps}"`, { stdio: 'pipe' })
       execSync(`"${installer}" /S`, { stdio: 'pipe' })  // /S = silent install
       if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via direct download'); _obsidianInstalled = true; return }
       warn('Obsidian installer ran but app not found at expected path. Open https://obsidian.md/download and install manually.')
-    } catch {
-      warn('Obsidian install skipped - get it from https://obsidian.md/download (vault still works as plain markdown)')
+    } catch (err) {
+      const reason = err?.stderr?.toString().split('\n')[0] || err?.message?.split('\n')[0] || 'unknown'
+      warn(`Obsidian install skipped (${reason}) - get it from https://obsidian.md/download (vault still works as plain markdown)`)
     }
   } else {
     warn('Linux: install Obsidian manually from https://obsidian.md/download (vault still works as plain markdown)')
@@ -407,6 +417,50 @@ ${ACCENT}
 ${RESET}
 `
 
+function detectStaleInstalls() {
+  // Surface (without auto-deleting) any leftover install state that points at a
+  // different folder than the current INSTALL_PATH. Common cause: user reinstalled
+  // into a fresh folder without cleaning up ~/nello-claw and the schtasks/launchd
+  // entry from a prior attempt, which fights the new daemon on next logon.
+  const here = resolve(INSTALL_PATH)
+  const dirCandidates = [join(homedir(), 'nello-claw')].filter(p => existsSync(p) && resolve(p) !== here)
+  const serviceCandidates = []
+  if (process.platform === 'darwin') {
+    const plist = join(homedir(), 'Library', 'LaunchAgents', `${LAUNCHAGENT_LABEL}.plist`)
+    if (existsSync(plist)) {
+      try {
+        const body = readFileSync(plist, 'utf-8')
+        if (!body.includes(here)) serviceCandidates.push(`launchd plist ${plist} (points outside ${here})`)
+      } catch { /* unreadable - leave alone */ }
+    }
+  } else if (process.platform === 'win32') {
+    const q = spawnSync('schtasks', ['/Query', '/TN', LAUNCHAGENT_LABEL, '/FO', 'LIST', '/V'], { stdio: 'pipe' })
+    if (q.status === 0) {
+      const out = q.stdout?.toString() || ''
+      if (!out.toLowerCase().includes(here.toLowerCase())) {
+        serviceCandidates.push(`schtasks "${LAUNCHAGENT_LABEL}" (points outside ${here})`)
+      }
+    }
+  } else if (process.platform === 'linux') {
+    const unit = join(homedir(), '.config', 'systemd', 'user', `${LAUNCHAGENT_LABEL}.service`)
+    if (existsSync(unit)) {
+      try {
+        const body = readFileSync(unit, 'utf-8')
+        if (!body.includes(here)) serviceCandidates.push(`systemd unit ${unit} (points outside ${here})`)
+      } catch { /* unreadable */ }
+    }
+  }
+  if (dirCandidates.length === 0 && serviceCandidates.length === 0) return
+  warn('Detected leftover state from a previous install:')
+  for (const d of dirCandidates) warn(`  - directory: ${d}`)
+  for (const s of serviceCandidates) warn(`  - service:   ${s}`)
+  warn('These will fight the new install on next logon. Recommended cleanup:')
+  if (dirCandidates.length > 0) warn(`  rm -rf ${dirCandidates.join(' ')}`)
+  if (process.platform === 'win32') warn(`  schtasks /Delete /F /TN "${LAUNCHAGENT_LABEL}"`)
+  if (process.platform === 'darwin') warn(`  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/${LAUNCHAGENT_LABEL}.plist; rm ~/Library/LaunchAgents/${LAUNCHAGENT_LABEL}.plist`)
+  if (process.platform === 'linux') warn(`  systemctl --user disable --now ${LAUNCHAGENT_LABEL}; rm ~/.config/systemd/user/${LAUNCHAGENT_LABEL}.service`)
+}
+
 async function main() {
   console.log(BANNER)
 
@@ -414,6 +468,8 @@ async function main() {
     fail(`bundle not found at ${BUNDLE_PATH}`)
     process.exit(1)
   }
+
+  detectStaleInstalls()
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
   const ctx = buildContext(bundle)
@@ -471,9 +527,18 @@ async function main() {
   installObsidianApp()
   try {
     execSync('npm install -g obsidian-cli', { stdio: 'pipe' })
-    ok('obsidian-cli installed globally')
+    // Verify it actually lands on PATH - npm global bin path mismatch is common on Windows.
+    const probe = spawnSync('obsidian-cli', ['--version'], { shell: true, stdio: 'pipe' })
+    if (probe.status === 0) {
+      ok('obsidian-cli installed globally')
+    } else {
+      let prefix = ''
+      try { prefix = execSync('npm config get prefix', { stdio: 'pipe' }).toString().trim() } catch {}
+      warn(`obsidian-cli installed but not on PATH${prefix ? ` (add ${prefix} to PATH)` : ''}. Vault still works as plain markdown.`)
+    }
   } catch (err) {
-    warn(`obsidian-cli install failed (${err.message?.split('\n')[0] || 'unknown'}). Vault still works as plain markdown.`)
+    const reason = err?.stderr?.toString().split('\n')[0] || err?.message?.split('\n')[0] || 'unknown'
+    warn(`obsidian-cli install failed (${reason}). Vault still works as plain markdown.`)
   }
 
   info('Installing uv (Python runtime for Google Workspace MCP)')

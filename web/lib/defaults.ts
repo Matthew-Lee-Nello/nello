@@ -61,10 +61,14 @@ export const DEFAULT_BUNDLE: Bundle = {
   // on non-Mac it falls back to off gracefully.
   voiceSource: 'local',
 
-  // Default skill pack (always installed)
+  // Mirror of template/skills/ — keep in sync when adding/removing bundled
+  // skills. The bootstrap symlinker reads the directory directly (it does not
+  // consult this list); this array is informational for the wizard summary
+  // + docs. Audit reads template/skills/ at runtime to avoid drift.
   skillPack: [
-    'checkpoint', 'find-skills', 'install-doctor', 'karpathy-guidelines',
-    'research', 'self-improving', 'think', 'vault-audit',
+    'diagnose', 'find-skills', 'grill-me', 'install-doctor',
+    'karpathy-guidelines', 'nello-build', 'nello-start', 'research',
+    'to-prd', 'write-skill', 'zoom-out',
   ],
   optionalSkills: [],
 
