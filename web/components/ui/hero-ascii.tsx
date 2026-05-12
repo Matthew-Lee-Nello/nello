@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Typewriter } from '@/components/ui/typewriter'
+import { ClaudeBuddy } from '@/components/ui/claude-buddy'
 
 // Claude mark — official path from claude.ai/favicon.svg (Anthropic Crail #D97757)
 const claudePath =
@@ -131,9 +132,14 @@ export default function HeroAscii() {
             </div>
           </div>
 
-          {/* Claude mark — right of text on desktop, above on mobile */}
-          <div className="shrink-0">
+          {/* Claude mark + little buddy stacked */}
+          <div className="flex flex-col items-center gap-3 shrink-0">
             <ClaudeMark size={280} />
+            <ClaudeBuddy
+              state="idle"
+              frameMs={420}
+              className="text-[var(--ink)] text-[14px] lg:text-[15px] opacity-80"
+            />
           </div>
         </div>
       </div>
