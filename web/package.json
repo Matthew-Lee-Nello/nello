@@ -12,11 +12,20 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "autoprefixer": "^10.5.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
+    "nanoid": "^5.0.7",
     "next": "^15.0.0",
+    "postcss": "^8.5.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zustand": "^4.5.4",
-    "nanoid": "^5.0.7"
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.0",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.0",
