@@ -41,6 +41,11 @@ export default function HeroAscii() {
         {' '}<span className="text-[var(--ink)]/60">@</span> NELLO LABS
       </div>
 
+      {/* Copyright — bottom-right */}
+      <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
+        © NELLO LABS 2026
+      </div>
+
       {/* Hero — content + mark, centred together as one group */}
       <div className="relative z-10 flex min-h-screen items-center justify-center px-6 lg:px-12">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
@@ -134,12 +139,15 @@ export default function HeroAscii() {
       </div>
 
       <style jsx>{`
+        /* Dramatic breath — mimics Claude app icon: shrinks small, expands back.
+           Pattern adapted from Apple Watch Breathe (scale 0.15 → 1, 4s,
+           cubic-bezier(0.5,0,0.5,1)). Tuned for headline placement. */
         @keyframes claude-pulse {
-          0%, 100% { transform: scale(0.75); opacity: 0.78; }
-          50%      { transform: scale(0.86); opacity: 1; }
+          0%, 100% { transform: scale(0.22); opacity: 0.55; }
+          50%      { transform: scale(0.86); opacity: 1;    }
         }
         :global(.claude-mark) {
-          animation: claude-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          animation: claude-pulse 3.6s cubic-bezier(0.5, 0, 0.5, 1) infinite;
           transform-origin: center;
           will-change: transform, opacity;
         }
