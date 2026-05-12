@@ -36,9 +36,16 @@ export default function HeroAscii() {
       <div className="absolute bottom-0 right-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-r-2 border-[var(--ink)]/25 z-20" />
 
       {/* Byline — bottom-left */}
-      <div className="absolute bottom-5 left-16 lg:bottom-6 lg:left-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
+      <div className="absolute bottom-5 left-16 lg:bottom-6 lg:left-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75">
         meticulously crafted by{' '}
-        <span className="text-[var(--ink)]">Matthew Lee</span>
+        <a
+          href="https://instagram.com/mattlee.nello"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--ink)] hover:text-[var(--accent)] underline underline-offset-2 decoration-[var(--ink)]/30 hover:decoration-[var(--accent)] transition-colors"
+        >
+          Matthew Lee
+        </a>
         {' '}<span className="text-[var(--ink)]/60">@</span> NELLO LABS
       </div>
 
