@@ -77,7 +77,6 @@ const MCP_PURPOSES = {
   obsidian: 'read/write your vault directly',
   exa: 'web research with citations',
   apify: 'web scraping + Actor marketplace',
-  n8n: 'workflow automation',
 }
 
 function buildContext(bundle) {
