@@ -41,48 +41,7 @@ export function ClaudeBuddy({
         }}
       />
 
-      {/* Eye overlay — sits inside the white eye holes of the source image */}
-      <div
-        className={`absolute inset-0 pointer-events-none ${animateEyes ? 'claude-buddy-eyes' : ''}`}
-      >
-        {/* Left eye */}
-        <div
-          className="absolute"
-          style={{
-            left: '31.5%',
-            top: '31%',
-            width: '7%',
-            height: '14%',
-            background: '#14110E',
-          }}
-        />
-        {/* Right eye */}
-        <div
-          className="absolute"
-          style={{
-            left: '61.5%',
-            top: '31%',
-            width: '7%',
-            height: '14%',
-            background: '#14110E',
-          }}
-        />
-      </div>
-
-      <style jsx>{`
-        @keyframes claude-eye-look {
-          0%, 18%, 100%   { transform: translateX(0); }
-          28%, 42%        { transform: translateX(-2.5%); }
-          55%, 70%        { transform: translateX(2.5%); }
-          82%             { transform: translateX(0); }
-        }
-        :global(.claude-buddy-eyes) {
-          animation: claude-eye-look 5s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          :global(.claude-buddy-eyes) { animation: none; }
-        }
-      `}</style>
+      {/* Eyes are baked into the image now — no overlay needed. */}
     </div>
   )
 }
