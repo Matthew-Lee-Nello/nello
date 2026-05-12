@@ -1,7 +1,37 @@
 @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* NelloClaw dashboard — locked tokens (mirrors Dashboard.zip) */
+/* Theme tokens. Light is the default; [data-theme="dark"] flips to dark. */
 :root {
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --panel: #fafafa;
+  --surface: #f0f0f0;
+  --border: #e5e5e5;
+  --text: #0a0a0a;
+  --dim: #555555;
+  --muted: #888888;
+
+  --accent: #FFA600;
+  --accent-soft: rgba(255, 166, 0, 0.10);
+  --accent-softer: rgba(255, 166, 0, 0.06);
+  --accent-border: rgba(255, 166, 0, 0.30);
+  --accent-dim: rgba(255, 166, 0, 0.14);
+
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+  --grey: #999999;
+
+  --font-sans: "Figtree", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --t-color: 150ms ease;
+  --t-opacity: 100ms ease;
+  --t-size: 200ms ease;
+}
+
+[data-theme="dark"] {
   color-scheme: dark;
 
   --bg: #0a0a0a;
@@ -12,23 +42,10 @@
   --dim: #a0a0a0;
   --muted: #666666;
 
-  --accent: #FFA600;
-  --accent-soft: rgba(255, 166, 0, 0.10);
-  --accent-softer: rgba(255, 166, 0, 0.06);
-  --accent-border: rgba(255, 166, 0, 0.25);
-  --accent-dim: rgba(255, 166, 0, 0.12);
-
   --green: #4ade80;
   --amber: #f59e0b;
   --red: #f87171;
   --grey: #444444;
-
-  --font-sans: "Figtree", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  --t-color: 150ms ease;
-  --t-opacity: 100ms ease;
-  --t-size: 200ms ease;
 }
 
 * { box-sizing: border-box; }
