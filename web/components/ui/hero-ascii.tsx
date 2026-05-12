@@ -136,10 +136,10 @@ export default function HeroAscii() {
           <div className="flex flex-col items-center gap-5 shrink-0">
             <ClaudeMark size={280} />
             <div className="flex flex-col items-center gap-2">
-              <ClaudeBuddy size={216} frameMs={440} />
+              <ClaudeBuddy size={200} />
               <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
                 <span className="w-1 h-1 rounded-full bg-[#16a34a] animate-pulse" />
-                CHONK · IDLE
+                CLAUDE CODE · ONLINE
               </div>
             </div>
           </div>
