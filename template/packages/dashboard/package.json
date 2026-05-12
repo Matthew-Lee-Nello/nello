@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
     "@nc/core": "workspace:*",
     "@nc/scheduler": "workspace:*",
     "cors": "^2.8.5",

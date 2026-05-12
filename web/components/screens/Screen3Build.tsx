@@ -11,7 +11,7 @@ The actual install steps:
 1. Confirm the current folder is empty (or only contains bundle.json). If not, stop and ask me to pick a fresh folder.
 2. git clone https://github.com/Matthew-Lee-Nello/nello-claw.git . (clone into current folder)
 3. pnpm install
-4. pnpm -r --filter '!@nc/web' build
+4. pnpm -r --filter '!@nc/web' build && pnpm --filter nello-claw-template build
 5. cp ~/Downloads/nello-claw-bundle.json ./bundle.json
 6. NC_INSTALL_PATH=$(pwd) node ./template/bootstrap.js
 

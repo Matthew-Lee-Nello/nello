@@ -49,9 +49,19 @@ function runChecks(): Check[] {
     checks.push({ name: 'Vault rules', ok: rules })
   }
 
-  // 4. Skill symlinks
+  // 4. Skill symlinks. Source of truth is the bundled template/skills/ directory:
+  // anything shipped there must be linked into ~/.claude/skills/. Reading the
+  // directory at audit time instead of a hardcoded list prevents drift.
   const skillsDir = process.env.NC_SKILLS_DIR || join(homedir(), '.claude', 'skills')
-  const expected = ['karpathy-guidelines', 'find-skills', 'research', 'checkpoint', 'think', 'self-improving', 'vault-audit']
+  const bundledSkillsDir = join(PROJECT_ROOT, 'template', 'skills')
+  let expected: string[] = []
+  try {
+    if (existsSync(bundledSkillsDir)) {
+      expected = readdirSync(bundledSkillsDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+        .map(e => e.name)
+    }
+  } catch { /* leave empty, will report as no checks rather than false negatives */ }
   for (const s of expected) {
     const p = join(skillsDir, s)
     checks.push({ name: `skill: ${s}`, ok: existsSync(p) })

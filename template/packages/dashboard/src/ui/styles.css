@@ -652,7 +652,10 @@ td.cell-dim { color: var(--dim); }
 /* ---- Chat ---- */
 .chat-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  /* minmax(0, 1fr) lets the pane track shrink below its content's min-content size,
+     which is what makes overflow:auto on inner <pre> blocks actually clip + scroll
+     instead of pushing the composer off-screen. */
+  grid-template-columns: 240px minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
@@ -748,6 +751,7 @@ td.cell-dim { color: var(--dim); }
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   position: relative;
 }
 .chat-header {
@@ -768,14 +772,19 @@ td.cell-dim { color: var(--dim); }
 .chat-header .ch-sub { color: var(--dim); font-size: 11px; display: flex; align-items: center; gap: 6px; }
 .chat-messages {
   flex: 1;
-  overflow: auto;
-  padding: 24px 80px 8px;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px 24px 8px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 .msg { display: flex; gap: 10px; max-width: 80%; }
 .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+/* The non-avatar child wraps the bubble + meta. Without min-width: 0 it sizes to
+   min-content (the widest <pre>), defeating the bubble's max-width: 100%. */
+.msg > div:not(.avatar) { min-width: 0; max-width: 100%; }
 .msg .bubble {
   padding: 10px 12px;
   border-radius: 10px;
@@ -785,6 +794,9 @@ td.cell-dim { color: var(--dim); }
   border: 1px solid var(--border);
   color: var(--text);
   word-wrap: break-word;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 /* User messages are plain text — preserve user line breaks. */
 .msg.user .bubble {
