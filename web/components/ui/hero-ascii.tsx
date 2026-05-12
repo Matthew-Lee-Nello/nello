@@ -37,9 +37,7 @@ export default function HeroAscii() {
       {/* Byline — bottom-left */}
       <div className="absolute bottom-5 left-16 lg:bottom-6 lg:left-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
         meticulously crafted by{' '}
-        <span className="font-serif italic text-[var(--ink)] text-[13px] lg:text-[15px] tracking-normal">
-          Matthew Lee
-        </span>
+        <span className="text-[var(--ink)]">Matthew Lee</span>
         {' '}<span className="text-[var(--ink)]/60">@</span> NELLO LABS
       </div>
 
