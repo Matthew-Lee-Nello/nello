@@ -75,7 +75,8 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="sb-banner">
-          <img src="/nello-labs-banner.png" alt="NELLO Labs" />
+          <img className="banner-dark" src="/nello-labs-banner.png" alt="NELLO Labs" />
+          <img className="banner-light" src="/nello-labs-banner-white.png" alt="NELLO Labs" />
         </div>
 
         <div
