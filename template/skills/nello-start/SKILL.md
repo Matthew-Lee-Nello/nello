@@ -35,6 +35,27 @@ Output everything in **ONE continuous flow**. No "type 1 to continue" gates. No 
 ═══════════════════════════════════════════════════════════════
 ```
 
+Then **before anything else**, lock in the one rule that runs everything from here:
+
+```
+═══════════════════════════════════════════════════════════════
+
+   ██╗███████╗    ██╗   ██╗ ██████╗ ██╗   ██╗
+   ██║██╔════╝    ╚██╗ ██╔╝██╔═══██╗██║   ██║
+   ██║█████╗       ╚████╔╝ ██║   ██║██║   ██║
+   ██║██╔══╝        ╚██╔╝  ██║   ██║██║   ██║
+   ██║██║            ██║   ╚██████╔╝╚██████╔╝
+   ╚═╝╚═╝            ╚═╝    ╚═════╝  ╚═════╝
+
+   DON'T KNOW WHAT TO DO?  ASK CLAUDE.
+
+   THAT'S HOW YOU TRAIN YOUR AI MUSCLE.
+
+═══════════════════════════════════════════════════════════════
+```
+
+Stuck? Ask. Confused? Ask. Don't know which slash command? Ask. Don't know what the bot can do? Ask. Every time you ask, you learn faster and you stop relying on me.
+
 Then say:
 
 **Welcome.**
@@ -98,6 +119,35 @@ Save this. Use it any time you don't know what to say.
 ```
 
 Plug in any goal. Get a plan back. Approve. Walk away while it runs.
+
+### Your slash commands (the shortcuts your AI knows)
+
+Slash commands are pre-built workflows your AI already knows how to run. You type `/`, pick one from the menu, and it goes. Works in both the dashboard chat and Claude Code in your terminal.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                                                          │
+  │   /nello-start    this welcome tour                      │
+  │   /nello-build    wire your first features (next step)   │
+  │   /research       live web research with Exa             │
+  │   /install-doctor sanity check what's running            │
+  │   /find-skills    browse + install more skills           │
+  │   /diagnose       fix something that's broken            │
+  │   /grill-me       stress-test a plan or decision         │
+  │   /to-prd         turn a conversation into a PRD         │
+  │   /write-skill    build a brand new slash command        │
+  │   /zoom-out       step back from the weeds               │
+  │                                                          │
+  └──────────────────────────────────────────────────────────┘
+```
+
+**How to use them:**
+
+1. In **Claude Code** (the terminal app), just type `/` and the menu opens. Pick one, hit enter, it runs.
+2. In the **dashboard chat** at `localhost:3000`, same thing - type `/`, the autocomplete shows up.
+3. **If a slash command doesn't show up**, start a new chat. Claude Code reloads its skills list per session. If it still doesn't show, just ask Claude to run it by name ("run nello-build").
+
+**You can write your own slash commands too.** That's what `/write-skill` is for. We'll do that together at the end of `/nello-build`.
 
 ### Quick check before we move on
 
