@@ -101,7 +101,7 @@ export default function HeroAscii() {
 
               <div className="relative">
                 <p className="text-xs lg:text-base text-[var(--muted)] mb-6 lg:mb-8 leading-relaxed font-mono max-w-md">
-                  An AI Chief Operations Officer that knows everything about you, and just does the job.
+                  AI Chief Operations Officer that actually gets sh*t done.
                 </p>
                 <div
                   className="hidden lg:block absolute -right-4 top-1/2 w-3 h-3 border border-[var(--ink)]/30"
