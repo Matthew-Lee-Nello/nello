@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { Typewriter } from '@/components/ui/typewriter'
 import { ClaudeBuddy } from '@/components/ui/claude-buddy'
-import { GuideToast } from '@/components/ui/guide-toast'
 
 // Claude mark — official path from claude.ai/favicon.svg (Anthropic Crail #D97757)
 const claudePath =
@@ -208,8 +207,6 @@ export default function HeroAscii() {
           .dot-grid::before, .dot-grid::after { animation: none; }
         }
       `}</style>
-
-      <GuideToast />
     </main>
   )
 }

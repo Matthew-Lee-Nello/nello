@@ -2,6 +2,7 @@
 
 import { useWizard } from '@/lib/store'
 import NavButtons from '@/components/NavButtons'
+import { GuideToast } from '@/components/ui/guide-toast'
 
 export default function Screen1Identity() {
   const { bundle, update } = useWizard()
@@ -47,6 +48,7 @@ export default function Screen1Identity() {
       </div>
 
       <NavButtons disableNext={!ready} />
+      <GuideToast />
     </div>
   )
 }
