@@ -75,14 +75,7 @@ export default function HeroAscii() {
                   YOUR
                   <span className="block text-[var(--ink)] mt-1 lg:mt-2 opacity-95">
                     <Typewriter
-                      text={[
-                        '24/7 EA',
-                        'AI COO',
-                        'CHIEF OF STAFF',
-                        'SECOND BRAIN',
-                        '24/7 EMPLOYEE',
-                        'ADMIN ENGINE',
-                      ]}
+                      text={['24/7 EA', 'AI COO', 'SECOND BRAIN']}
                       speed={90}
                       deleteSpeed={50}
                       waitTime={2200}
