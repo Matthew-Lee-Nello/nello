@@ -56,6 +56,16 @@ Then **before anything else**, lock in the one rule that runs everything from he
 
 Stuck? Ask. Confused? Ask. Don't know which slash command? Ask. Don't know what the bot can do? Ask. Every time you ask, you learn faster and you stop relying on me.
 
+**Here's by far the biggest cheatcode.**
+
+Want your agent to learn ANYTHING?
+
+```
+  /find-skill [thing you want the agent to do]
+```
+
+It searches the open skills ecosystem, vets the candidate against a red-flag checklist (no curl-to-unknown, no credential reads, no obfuscated code), and only installs if it passes. Try it once today. You'll never wonder "can my AI do X" again - you'll just ask it to find a skill.
+
 Then say:
 
 **Welcome.**
@@ -131,7 +141,7 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
   │   /nello-build    wire your first features (next step)   │
   │   /research       live web research with Exa             │
   │   /install-doctor sanity check what's running            │
-  │   /find-skills    browse + install more skills           │
+  │   /find-skill     find + vet + install any new skill     │
   │   /diagnose       fix something that's broken            │
   │   /grill-me       stress-test a plan or decision         │
   │   /to-prd         turn a conversation into a PRD         │

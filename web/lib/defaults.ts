@@ -66,7 +66,7 @@ export const DEFAULT_BUNDLE: Bundle = {
   // consult this list); this array is informational for the wizard summary
   // + docs. Audit reads template/skills/ at runtime to avoid drift.
   skillPack: [
-    'diagnose', 'find-skills', 'grill-me', 'install-doctor',
+    'diagnose', 'find-skill', 'grill-me', 'install-doctor',
     'karpathy-guidelines', 'nello-build', 'nello-start', 'research',
     'to-prd', 'write-skill', 'zoom-out',
   ],

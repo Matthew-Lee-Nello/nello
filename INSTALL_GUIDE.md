@@ -25,7 +25,7 @@ Running the install fills your chosen folder with:
 - `store/clawd.db` - SQLite database for short-term conversation context, scheduled tasks, sessions
 - `node_modules/`, `dist/` - dependencies and compiled code
 - `.claude/settings.json` - **project-scoped** Claude Code settings (see "Security" below)
-- All bundled abilities (skills) get symlinked into `~/.claude/skills/` so Claude Code can discover them when working in `<install-folder>/`. Current count: 11 (find-skills, install-doctor, karpathy-guidelines, research, diagnose, grill-me, zoom-out, to-prd, write-skill, nello-start, nello-build).
+- All bundled abilities (skills) get symlinked into `~/.claude/skills/` so Claude Code can discover them when working in `<install-folder>/`. Current count: 11 (find-skill, install-doctor, karpathy-guidelines, research, diagnose, grill-me, zoom-out, to-prd, write-skill, nello-start, nello-build).
 
 It also auto-installs (if missing):
 - **Obsidian.app** (Mac via Homebrew cask, Windows via winget) - so your vault opens in a real app, not just on disk
@@ -45,7 +45,7 @@ When the install finishes the dashboard opens in app-mode AND your vault opens i
 2. Renders Handlebars templates with your values to write `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.env`
 3. Sets `chmod 600` on `.env` so other users on your machine cannot read it
 4. Seeds your notes folder from the preset you picked
-5. Symlinks the bundled abilities (skills) into `~/.claude/skills/` - currently 11 of them (find-skills, install-doctor, karpathy-guidelines, research, diagnose, grill-me, zoom-out, to-prd, write-skill, nello-start, nello-build). If a skill with the same name already exists there, the existing one is renamed to `.bak-<timestamp>` first
+5. Symlinks the bundled abilities (skills) into `~/.claude/skills/` - currently 11 of them (find-skill, install-doctor, karpathy-guidelines, research, diagnose, grill-me, zoom-out, to-prd, write-skill, nello-start, nello-build). If a skill with the same name already exists there, the existing one is renamed to `.bak-<timestamp>` first
 6. Writes a project-scoped `.claude/settings.json` inside `<install-folder>/` with hooks + `bypassPermissions: true` for THAT project only
 7. Creates `store/`, `workspace/uploads/`, `vault/Memory/`, `vault/Journal/` directories
 8. Installs Obsidian.app (Homebrew cask on Mac, winget on Windows) and `obsidian-cli` globally via npm so your assistant can drive Obsidian from the command line. Skipped if Obsidian is already installed.
@@ -79,7 +79,7 @@ After install: delete `~/Downloads/nello-claw-bundle.json` yourself. The install
 
 Those are open-source SKILL.md files in the public repo at github.com/Matthew-Lee-Nello/nello-claw. Read them before approving the install if you want to know what abilities your assistant gets:
 - [skills/karpathy-guidelines](template/skills/karpathy-guidelines/) - clean code reasoning
-- [skills/find-skills](template/skills/find-skills/) - discover more abilities
+- [skills/find-skill](template/skills/find-skill/) - discover + vet + install new abilities
 - [skills/research](template/skills/research/) - parallel web research
 - [skills/checkpoint](template/skills/checkpoint/) - save session before clearing
 - [skills/think](template/skills/think/) - structured problem breakdown
