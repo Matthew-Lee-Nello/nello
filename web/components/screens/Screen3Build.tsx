@@ -22,6 +22,7 @@ After the bootstrap finishes, tell me to run /nello-start in this same terminal 
 Adapt the commands for my OS (Mac/Windows/Linux). Ask me before any destructive operation.`
 
 const MAC_FALLBACK = 'curl -fsSL https://labs.nello.gg/i/mac | bash'
+const LINUX_FALLBACK = 'curl -fsSL https://labs.nello.gg/i/linux | bash'
 const WIN_FALLBACK = 'irm https://labs.nello.gg/i/win | iex'
 
 function mask(s: string): string {
@@ -30,15 +31,59 @@ function mask(s: string): string {
   return s.slice(0, 4) + '...' + s.slice(-4)
 }
 
+// Detect platform from the actual browser instead of trusting `bundle.platform`,
+// which is hard-coded to 'mac' in defaults.ts and never updated by any UI. The
+// old fallback showed Mac users the right command, but every Linux user saw
+// the Mac line and every Windows user the same — confusing the few who relied
+// on this fallback path. Server-side rendering returns 'mac' (it's the safe
+// default for the static build); a client-side replacement happens on hydrate.
+function detectPlatform(): 'mac' | 'windows' | 'linux' {
+  if (typeof navigator === 'undefined') return 'mac'
+  const ua = navigator.userAgent?.toLowerCase() || ''
+  const p = navigator.platform?.toLowerCase() || ''
+  if (p.includes('win') || ua.includes('windows')) return 'windows'
+  if (p.includes('linux') || (ua.includes('linux') && !ua.includes('android'))) return 'linux'
+  return 'mac'
+}
+function fallbackFor(platform: 'mac' | 'windows' | 'linux'): string {
+  if (platform === 'windows') return WIN_FALLBACK
+  if (platform === 'linux') return LINUX_FALLBACK
+  return MAC_FALLBACK
+}
+
 export default function Screen4Build() {
   const { bundle } = useWizard()
   const [compiling, setCompiling] = useState(false)
   const [token, setToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const compileAndDownload = async () => {
     setCompiling(true)
+    setError(null)
     try {
+      // Call /api/compile FIRST so a network failure does not leave a secret-
+      // bearing bundle file in the user's Downloads with no working token /
+      // install instructions. On success we download the bundle and surface
+      // the install prompt; on failure the user gets a retry-friendly error
+      // instead of a half-finished state.
+      const res = await fetch('/api/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meta: { at: Date.now() } }),
+      })
+      if (!res.ok) {
+        const detail = res.status === 429 ? 'Too many builds. Wait a minute and try again.' : `Compile failed (HTTP ${res.status}). Try again.`
+        setError(detail)
+        return
+      }
+      let data: { token?: unknown } = {}
+      try { data = await res.json() } catch { setError('Compile returned an unreadable response. Try again.'); return }
+      if (typeof data.token !== 'string') {
+        setError('Compile returned no token. Try again.')
+        return
+      }
+
       const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -47,12 +92,6 @@ export default function Screen4Build() {
       a.click()
       URL.revokeObjectURL(url)
 
-      const res = await fetch('/api/compile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meta: { at: Date.now() } }),
-      })
-      const data = await res.json()
       setToken(data.token)
     } finally {
       setCompiling(false)
@@ -136,8 +175,13 @@ export default function Screen4Build() {
             Don&apos;t have Claude Code yet?{' '}
             <a href="https://claude.com/product/claude-code" target="_blank" rel="noopener">Install it first</a>{' '}
             then come back here. Or use the bash one-liner fallback:{' '}
-            <code style={{ wordBreak: 'break-all' }}>{bundle.platform === 'windows' ? WIN_FALLBACK : MAC_FALLBACK}</code>
+            <code style={{ wordBreak: 'break-all' }}>{fallbackFor(detectPlatform())}</code>
           </p>
+        </div>
+      )}
+      {error && (
+        <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--accent)', borderRadius: 8, background: 'var(--accent-dim)', fontSize: 13 }}>
+          {error}
         </div>
       )}
     </div>
