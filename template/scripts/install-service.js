@@ -19,6 +19,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const TEMPLATE_DIR = join(__dirname, '..')
 const INSTALL = process.env.NC_INSTALL_PATH || join(homedir(), 'nello-claw')
 const LABEL = process.env.NC_LAUNCHAGENT_LABEL || 'com.nello-claw.server'
+
+// LABEL is interpolated into launchctl/schtasks/systemctl invocations AND into
+// plist/systemd-unit bodies. Restrict to reverse-DNS-style identifiers so it
+// can't break out of any of those contexts. Same regex as bootstrap.js.
+if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(LABEL)) {
+  console.error(`\x1b[38;2;255;80;80m✗\x1b[0m Invalid NC_LAUNCHAGENT_LABEL: ${JSON.stringify(LABEL)}. Allowed: alphanumeric + . _ - (max 128 chars).`)
+  process.exit(1)
+}
+
 const NODE = process.execPath
 // Daemon entry compiled to template/dist/index.js (the @nc/template package
 // builds into its own dist/, not the install root). Don't change without also
@@ -72,12 +81,14 @@ function installMac() {
 `
   writeFileSync(dest, plist)
   const uid = process.getuid?.() ?? 501
-  try { execSync(`launchctl bootout gui/${uid}/${LABEL}`, { stdio: 'ignore' }) } catch {}
-  try {
-    execSync(`launchctl bootstrap gui/${uid} "${dest}"`, { stdio: 'ignore' })
+  // argv form avoids any shell-interpretation of LABEL/dest, even though both
+  // are now regex-validated. Defence in depth.
+  spawnSync('launchctl', ['bootout', `gui/${uid}/${LABEL}`], { stdio: 'ignore' })
+  const r = spawnSync('launchctl', ['bootstrap', `gui/${uid}`, dest], { stdio: 'pipe' })
+  if (r.status === 0) {
     ok(`LaunchAgent loaded (${LABEL})`)
-  } catch (err) {
-    fail(`LaunchAgent load failed: ${err.message}`)
+  } else {
+    fail(`LaunchAgent load failed: ${r.stderr?.toString().split('\n')[0] || 'unknown'}`)
     process.exit(1)
   }
 }
@@ -100,7 +111,8 @@ function installWindows() {
   writeFileSync(wrapper, wrapperContent)
 
   // Wipe any stale schtasks entry from previous installs (safe if it doesn't exist).
-  try { execSync(`schtasks /Delete /F /TN "${LABEL}"`, { stdio: 'ignore' }) } catch {}
+  // argv form so LABEL is never re-interpreted by cmd.exe quoting.
+  spawnSync('schtasks', ['/Delete', '/F', '/TN', LABEL], { stdio: 'ignore' })
 
   // Drop the startup-folder .lnk. WScript.Shell COM via PowerShell - same
   // pattern as createWindowsShortcuts in bootstrap.js.
@@ -158,12 +170,13 @@ StandardError=append:${INSTALL}/store/server.log
 WantedBy=default.target
 `
   writeFileSync(dest, unit)
-  try {
-    execSync('systemctl --user daemon-reload', { stdio: 'ignore' })
-    execSync(`systemctl --user enable --now ${LABEL}`, { stdio: 'ignore' })
+  const reload = spawnSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'pipe' })
+  const enable = spawnSync('systemctl', ['--user', 'enable', '--now', LABEL], { stdio: 'pipe' })
+  if (reload.status === 0 && enable.status === 0) {
     ok(`systemd user service enabled (${LABEL})`)
-  } catch (err) {
-    fail(`systemctl failed: ${err.message}. Run 'loginctl enable-linger $USER' if running headless.`)
+  } else {
+    const err = (enable.stderr || reload.stderr)?.toString().split('\n')[0] || 'unknown'
+    fail(`systemctl failed: ${err}. Run 'loginctl enable-linger $USER' if running headless.`)
     process.exit(1)
   }
 }

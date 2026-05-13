@@ -25,15 +25,15 @@ Running the install fills your chosen folder with:
 - `store/clawd.db` - SQLite database for short-term conversation context, scheduled tasks, sessions
 - `node_modules/`, `dist/` - dependencies and compiled code
 - `.claude/settings.json` - **project-scoped** Claude Code settings (see "Security" below)
-- All bundled abilities (skills) get symlinked into `~/.claude/skills/` so Claude Code can discover them when working in `<install-folder>/`. Current count: 11 (find-skill, install-doctor, karpathy-guidelines, research, diagnose, grill-me, zoom-out, to-prd, write-skill, nello-start, nello-build).
+- All bundled abilities (skills) get symlinked into `~/.claude/skills/` so Claude Code can discover them when working in `<install-folder>/`. See `template/skills/` in the repo for the current list.
 
 It also auto-installs (if missing):
 - **Obsidian.app** (Mac via Homebrew cask, Windows via winget) - so your vault opens in a real app, not just on disk
 - **obsidian-cli** (npm global) - lets your assistant write/search the vault from the command line
 
 If you opted in:
-- A LaunchAgent (Mac) or Task Scheduler entry (Windows) or systemd user service (Linux) so the daemon starts on login
-- A `nello-claw.app` (Mac) or Start Menu shortcut (Windows) that opens the dashboard at `localhost:3000` in app-mode
+- A LaunchAgent (Mac) or per-user Startup-folder `.lnk` (Windows, no admin/UAC required) or systemd user service (Linux) so the daemon starts on login
+- A `nello-claw.app` (Mac) or Start Menu + Desktop shortcut (Windows) that opens the dashboard at `localhost:3000` in app-mode
 
 When the install finishes the dashboard opens in app-mode AND your vault opens in Obsidian alongside it.
 
@@ -45,13 +45,13 @@ When the install finishes the dashboard opens in app-mode AND your vault opens i
 2. Renders Handlebars templates with your values to write `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.env`
 3. Sets `chmod 600` on `.env` so other users on your machine cannot read it
 4. Seeds your notes folder from the preset you picked
-5. Symlinks the bundled abilities (skills) into `~/.claude/skills/` - currently 11 of them (find-skill, install-doctor, karpathy-guidelines, research, diagnose, grill-me, zoom-out, to-prd, write-skill, nello-start, nello-build). If a skill with the same name already exists there, the existing one is renamed to `.bak-<timestamp>` first
+5. Symlinks the bundled abilities (skills) into `~/.claude/skills/`. The skill set in `template/skills/` is the source of truth - count varies as we add or retire skills. If a skill with the same name already exists there, the existing one is renamed to `.bak-<timestamp>` first
 6. Writes a project-scoped `.claude/settings.json` inside `<install-folder>/` with hooks + `bypassPermissions: true` for THAT project only
 7. Creates `store/`, `workspace/uploads/`, `vault/Memory/`, `vault/Journal/` directories
 8. Installs Obsidian.app (Homebrew cask on Mac, winget on Windows) and `obsidian-cli` globally via npm so your assistant can drive Obsidian from the command line. Skipped if Obsidian is already installed.
-8. If you opted into auto-start: registers the service via `launchctl` (Mac) / `schtasks` (Windows) / `systemctl --user` (Linux)
-9. If you opted into morning brief: seeds a scheduled task in the SQLite DB
-10. Runs `nello-claw audit` to verify everything
+9. If you opted into auto-start: registers the service via `launchctl` (Mac) / per-user Startup-folder `.lnk` (Windows) / `systemctl --user` (Linux)
+10. If you opted into morning brief: seeds a scheduled task in the SQLite DB
+11. Runs `nello-claw audit` to verify everything
 
 You can read the full script at the path above before running.
 
@@ -78,13 +78,7 @@ After install: delete `~/Downloads/nello-claw-bundle.json` yourself. The install
 **3. The skill symlinks point at files inside `<install-folder>/template/skills/`.**
 
 Those are open-source SKILL.md files in the public repo at github.com/Matthew-Lee-Nello/nello-claw. Read them before approving the install if you want to know what abilities your assistant gets:
-- [skills/karpathy-guidelines](template/skills/karpathy-guidelines/) - clean code reasoning
-- [skills/find-skill](template/skills/find-skill/) - discover + vet + install new abilities
-- [skills/research](template/skills/research/) - parallel web research
-- [skills/checkpoint](template/skills/checkpoint/) - save session before clearing
-- [skills/think](template/skills/think/) - structured problem breakdown
-- [skills/self-improving](template/skills/self-improving/) - agent reflects on mistakes
-- [skills/vault-audit](template/skills/vault-audit/) - vault hygiene checker
+For the current set, browse [template/skills/](template/skills/) in the repo. Each subfolder is a skill with a SKILL.md file describing its purpose. Examples that ship today: clean-code reasoning, find-skill (discover + vet + install new abilities), parallel web research, session checkpoint, structured problem breakdown, vault hygiene checker, self-reflection loop.
 
 ## What it does NOT do
 

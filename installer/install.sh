@@ -42,6 +42,17 @@ if [ -d "$INSTALL_PATH" ]; then
   fi
 fi
 
+# Reject preexisting bundle.json / install.log if they are symlinks. Without this,
+# an attacker who can pre-place a symlink (e.g. `install.log -> /etc/shadow`) turns
+# `tee -a` and `cp` below into an append/overwrite primitive on whatever the link
+# points at.
+for _NC_TARGET in "$INSTALL_PATH/install.log" "$INSTALL_PATH/bundle.json"; do
+  if [ -L "$_NC_TARGET" ]; then
+    fail "Refusing to install: $_NC_TARGET is a symlink. Remove it and rerun."
+  fi
+done
+unset _NC_TARGET
+
 mkdir -p "$INSTALL_PATH"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -135,6 +146,12 @@ ok "template ready"
 # 7. Copy bundle into place (skip if source and destination are the same file - BSD cp returns
 # non-zero with `set -e` otherwise, killing the install for anyone whose bundle already lives in
 # the install dir).
+# Defence-in-depth: re-check the destination is not a symlink. The pre-clone check
+# already rejected this, but rsync's -a preserves source-side symlinks and a hostile
+# repo could in theory ship one. cp follows symlinks; we don't want to.
+if [ -L "$INSTALL_PATH/bundle.json" ]; then
+  fail "Refusing to write bundle: $INSTALL_PATH/bundle.json became a symlink."
+fi
 if [ "$BUNDLE_PATH" != "$INSTALL_PATH/bundle.json" ]; then
   cp "$BUNDLE_PATH" "$INSTALL_PATH/bundle.json"
 fi

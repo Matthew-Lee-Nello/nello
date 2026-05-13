@@ -38,6 +38,19 @@ if ((Test-Path $InstallPath) -and -not (Test-Path (Join-Path $InstallPath ".git"
   }
 }
 
+# Reject preexisting bundle.json / install.log if they are reparse points (junctions/symlinks).
+# Without this, an attacker who can pre-place such a link turns Start-Transcript and
+# Copy-Item below into an overwrite primitive on whatever the link points at.
+foreach ($_NC_NAME in @('install.log', 'bundle.json')) {
+  $_NC_TARGET = Join-Path $InstallPath $_NC_NAME
+  if (Test-Path $_NC_TARGET) {
+    $_NC_ITEM = Get-Item $_NC_TARGET -Force
+    if ($_NC_ITEM.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+      Fail "Refusing to install: $_NC_TARGET is a symlink/junction. Remove it and rerun."
+    }
+  }
+}
+
 New-Item -ItemType Directory -Force -Path $InstallPath | Out-Null
 Start-Transcript -Path $LogFile -Force | Out-Null
 
@@ -115,8 +128,15 @@ if (Test-Path (Join-Path $InstallPath ".git")) {
 }
 Ok "template ready"
 
-# 7. Copy bundle
-Copy-Item $BundlePath (Join-Path $InstallPath "bundle.json") -Force
+# 7. Copy bundle (defence-in-depth: re-check destination is not a reparse point)
+$_NC_BUNDLE_DEST = Join-Path $InstallPath "bundle.json"
+if (Test-Path $_NC_BUNDLE_DEST) {
+  $_NC_BUNDLE_ITEM = Get-Item $_NC_BUNDLE_DEST -Force
+  if ($_NC_BUNDLE_ITEM.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+    Fail "Refusing to write bundle: $_NC_BUNDLE_DEST became a symlink/junction."
+  }
+}
+Copy-Item $BundlePath $_NC_BUNDLE_DEST -Force
 
 # 8. Install deps + build
 Set-Location $InstallPath

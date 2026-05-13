@@ -3,7 +3,14 @@ import { NextResponse } from 'next/server'
 export const runtime = 'edge'
 
 const REPO = 'Matthew-Lee-Nello/nello-claw'
-const REF = 'main'
+
+// SECURITY: this ref is interpolated into a `curl | bash` (and `iex` on Windows)
+// launcher that runs on every customer machine. `main` is mutable — a force-push
+// or repo compromise turns one bad commit into RCE on every fresh install.
+//
+// In production set INSTALLER_REF to an immutable release tag (e.g. `v0.1.0`)
+// or full commit SHA in the Vercel env. Local dev falls back to `main`.
+const REF = process.env.INSTALLER_REF || 'main'
 
 const MAC_LAUNCHER = `#!/bin/bash
 # nello-claw bootstrap loader (Mac/Linux). Pulls the real installer + runs it.

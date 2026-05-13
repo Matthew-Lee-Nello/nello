@@ -15,17 +15,26 @@ NELLO Labs operates `labs.nello.gg` (the wizard) and the public GitHub repo. We 
 
 ## What the install touches on your machine
 
-- `~/nello-claw/` — created by install
-- `~/nello-claw/.claude/settings.json` — **project-scoped** Claude Code settings (only applies inside `~/nello-claw/`)
-- `~/.claude/skills/<seven-symlinks>` — symbolic links pointing at the bundled abilities in `~/nello-claw/template/skills/`
+In the install folder (whatever folder you `cd`'d into before running):
+- `<install-folder>/` — the cloned repo + `.env` + `vault/` + `store/` + `node_modules/`
+- `<install-folder>/.claude/settings.json` — **project-scoped** Claude Code settings (only applies inside this folder)
+
+Outside the install folder:
+- `~/.claude/skills/<one-symlink-per-bundled-skill>` — symbolic links pointing at the bundled abilities in `<install-folder>/template/skills/`
 - `~/Library/LaunchAgents/com.nello-claw.server.plist` (Mac only, if you opted in to auto-start)
-- Equivalent on Windows: a Task Scheduler entry named `com.nello-claw.server`
-- Equivalent on Linux: `~/.config/systemd/user/com.nello-claw.server.service`
+- Windows auto-start: a `.lnk` in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\` (per-user; no admin/UAC required)
+- Linux auto-start: `~/.config/systemd/user/com.nello-claw.server.service`
+- `~/Applications/nello-claw.app` (Mac) or Start Menu + Desktop shortcuts (Windows) — open the dashboard in app-mode
+
+System-level packages installed if missing (uses your existing package manager, prompts for password when the package manager does):
+- **Mac:** Homebrew (if missing), `node@20`, `git`, `uv`, `obsidian` cask (installs Obsidian.app to `/Applications/`)
+- **Windows:** `OpenJS.NodeJS.LTS`, `Git.Git`, `astral-sh.uv`, `Obsidian.Obsidian` via `winget`
+- **Linux:** `nodejs` via `apt-get`, `uv` via `astral.sh` script
+- **All platforms:** `pnpm`, `@anthropic-ai/claude-code`, `obsidian-cli` via `npm install -g`
 
 It does NOT touch:
 - Your global `~/.claude/settings.json`
-- Anything in `/usr/local/`, `/opt/`, `/Applications/` (outside the optional `~/Applications/nello-claw.app` shortcut)
-- Anything outside your home directory
+- Files outside the locations listed above
 
 ## bypassPermissions clarification
 

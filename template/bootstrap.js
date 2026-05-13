@@ -15,12 +15,13 @@
  *   7. Run audit at the end
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, copyFileSync, readdirSync, chmodSync, renameSync } from 'node:fs'
-import { join, dirname, basename, resolve } from 'node:path'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, copyFileSync, readdirSync, chmodSync, renameSync, realpathSync } from 'node:fs'
+import { join, dirname, basename, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 import { execSync, spawnSync } from 'node:child_process'
 import Handlebars from 'handlebars'
+import { randomBytes } from 'node:crypto'
 
 // Use fileURLToPath so install paths with spaces (e.g. "/Users/foo/Work - Claude AI/")
 // don't end up percent-encoded. new URL(...).pathname keeps "%20" for spaces.
@@ -34,6 +35,16 @@ const BUNDLE_PATH = process.env.NC_BUNDLE || join(INSTALL_PATH, 'bundle.json')
 const SETTINGS_PATH = process.env.NC_SETTINGS_PATH || join(INSTALL_PATH, '.claude', 'settings.json')
 const SKILLS_DIR = process.env.NC_SKILLS_DIR || join(homedir(), '.claude', 'skills')
 const LAUNCHAGENT_LABEL = process.env.NC_LAUNCHAGENT_LABEL || 'com.nello-claw.server'
+
+// NC_LAUNCHAGENT_LABEL is interpolated into launchctl/schtasks/systemctl commands
+// AND into plist/systemd-unit XML/INI bodies. Restrict to reverse-DNS-style labels
+// so it can't break out of any of those contexts even if a downstream call uses
+// shell-string interpolation.
+const LABEL_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/
+if (!LABEL_RE.test(LAUNCHAGENT_LABEL)) {
+  console.error(`\x1b[38;2;255;80;80m✗\x1b[0m Invalid NC_LAUNCHAGENT_LABEL: ${JSON.stringify(LAUNCHAGENT_LABEL)}. Allowed: alphanumeric + . _ - (max 128 chars).`)
+  process.exit(1)
+}
 
 // Theme: FFA600 accent via 24-bit truecolour. Falls back gracefully on plain terminals.
 const ACCENT = '\x1b[38;2;255;166;0m'
@@ -127,6 +138,13 @@ function symlinkSkills() {
   const dest = SKILLS_DIR
   mkdirSync(dest, { recursive: true })
 
+  // Resolve the canonical skills root once so we can verify every individual
+  // skill entry actually lives under it. Without this check, a hostile fork or
+  // a symlinked entry inside template/skills/ would get a globally-discoverable
+  // ~/.claude/skills/<name> pointing anywhere on disk.
+  const skillsRoot = realpathSync(src)
+  let linked = 0
+
   // Use 'junction' on Windows so users don't need Developer Mode or admin to
   // install. Junctions work for directory targets exactly like symlinks but
   // don't require the SeCreateSymbolicLinkPrivilege. All bundled skills are
@@ -135,6 +153,17 @@ function symlinkSkills() {
 
   for (const name of readdirSync(src)) {
     const srcPath = join(src, name)
+    let realSrc
+    try {
+      realSrc = realpathSync(srcPath)
+    } catch {
+      warn(`skill ${name}: can't resolve path, skipping`)
+      continue
+    }
+    if (realSrc !== skillsRoot && !realSrc.startsWith(skillsRoot + sep)) {
+      warn(`skill ${name}: resolves outside template/skills (${realSrc}), skipping`)
+      continue
+    }
     const destPath = join(dest, name)
     if (existsSync(destPath)) {
       try {
@@ -152,16 +181,25 @@ function symlinkSkills() {
     }
     try {
       symlinkSync(srcPath, destPath, linkType)
+      linked++
     } catch (err) {
       warn(`couldn't link ${name}: ${err.message?.split('\n')[0] || 'unknown'}. Skill won't be discoverable until linked manually.`)
     }
   }
-  ok(`linked ${readdirSync(src).length} skills into ${dest}`)
+  ok(`linked ${linked} skills into ${dest}`)
 }
 
 function mergeSettingsJson(ctx) {
   const settingsPath = SETTINGS_PATH
   mkdirSync(dirname(settingsPath), { recursive: true })
+
+  // Refuse to write through a symlink. Without this an attacker who can place a
+  // symlink at .claude/settings.json (or who races us in a shared install dir)
+  // can redirect this write at any user-writable file.
+  if (existsSync(settingsPath) && lstatSync(settingsPath).isSymbolicLink()) {
+    fail(`Refusing to write through symlink: ${settingsPath}`)
+    process.exit(1)
+  }
 
   const newSettings = JSON.parse(Handlebars.compile(
     readFileSync(join(TEMPLATE_DIR, 'hooks', 'settings.json.hbs'), 'utf-8'),
@@ -179,7 +217,12 @@ function mergeSettingsJson(ctx) {
   merged.enabledPlugins = { ...(existing.enabledPlugins || {}), ...newSettings.enabledPlugins }
   merged.extraKnownMarketplaces = { ...(existing.extraKnownMarketplaces || {}), ...newSettings.extraKnownMarketplaces }
 
-  writeFileSync(settingsPath, JSON.stringify(merged, null, 2))
+  // Atomic write: serialize to a temp file in the same dir then rename. A crash
+  // mid-write can no longer leave a truncated settings.json that breaks Claude
+  // Code at next session start.
+  const tmpPath = `${settingsPath}.tmp.${process.pid}.${randomBytes(4).toString('hex')}`
+  writeFileSync(tmpPath, JSON.stringify(merged, null, 2))
+  renameSync(tmpPath, settingsPath)
   ok(`wrote project-scoped settings: ${settingsPath}`)
 }
 
@@ -366,16 +409,29 @@ function installObsidianApp() {
     // ships versioned filenames (e.g. Obsidian-1.5.12.exe), not a stable Obsidian.exe.
     try {
       const installer = join(process.env.TEMP || process.env.LOCALAPPDATA || '.', 'Obsidian-installer.exe')
+      // Escape PowerShell single-quote literal for paths that may contain `'`
+      // (e.g. `C:\Users\O'Brien\AppData\Local\Temp`). Without this the single-
+      // quoted PS string breaks and the user gets a confusing parser error or,
+      // worse, runs arbitrary follow-on text as a command.
+      const installerPsLit = installer.replace(/'/g, "''")
       info('Resolving latest Obsidian installer (winget unavailable)...')
       const ps = [
         "$ErrorActionPreference='Stop'",
         "$rel = Invoke-RestMethod 'https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest'",
         "$asset = $rel.assets | Where-Object { $_.name -match '^Obsidian-\\d+\\.\\d+\\.\\d+\\.exe$' } | Select-Object -First 1",
         "if (-not $asset) { throw 'no matching installer in latest release' }",
-        `Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '${installer}'`,
+        `Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '${installerPsLit}'`,
       ].join('; ')
-      execSync(`powershell -NoProfile -Command "${ps}"`, { stdio: 'pipe' })
-      execSync(`"${installer}" /S`, { stdio: 'pipe' })  // /S = silent install
+      // spawnSync with argv avoids the cmd.exe quoting layer entirely — safer than
+      // execSync(`powershell -Command "${ps}"`) when ps contains nested quotes.
+      const psRes = spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'pipe' })
+      if (psRes.status !== 0) {
+        throw new Error(psRes.stderr?.toString().split('\n')[0] || 'powershell download failed')
+      }
+      const runRes = spawnSync(installer, ['/S'], { stdio: 'pipe' })  // /S = silent install
+      if (runRes.status !== 0) {
+        throw new Error(runRes.stderr?.toString().split('\n')[0] || 'installer exit non-zero')
+      }
       if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via direct download'); _obsidianInstalled = true; return }
       warn('Obsidian installer ran but app not found at expected path. Open https://obsidian.md/download and install manually.')
     } catch (err) {
