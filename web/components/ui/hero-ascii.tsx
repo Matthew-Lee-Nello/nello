@@ -52,7 +52,7 @@ export default function HeroAscii() {
       {/* Copyright + VirusTotal trust link — bottom-right */}
       <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 flex flex-col items-end gap-1">
         <a
-          href="https://www.virustotal.com/gui/url/289f3e236421cc2ce3a718f237346781beb8d9ff00b3865fee6f6702c7a4b4dd"
+          href="https://www.virustotal.com/gui/url-analysis/u-3d34654f8235ae827d8532f2266fca7c37b85265c0a70fd0098d0028605dd061-bc5c3474"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-[var(--ink)] hover:text-[var(--accent)] transition-colors group"
@@ -102,21 +102,6 @@ export default function HeroAscii() {
                 ))}
               </div>
 
-              <div className="relative">
-                <p className="text-xs lg:text-base text-[var(--muted)] mb-6 lg:mb-8 leading-relaxed font-mono max-w-md">
-                  Your AI Chief Operations Officer that actually gets sh*t done.
-                </p>
-                <div
-                  className="hidden lg:block absolute -right-4 top-1/2 w-3 h-3 border border-[var(--ink)]/30"
-                  style={{ transform: 'translateY(-50%)' }}
-                >
-                  <div
-                    className="absolute top-1/2 left-1/2 w-1 h-1 bg-[var(--ink)]"
-                    style={{ transform: 'translate(-50%, -50%)' }}
-                  />
-                </div>
-              </div>
-
               <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
                 <Link href="/wizard" className="contents">
                   <button
@@ -146,6 +131,10 @@ export default function HeroAscii() {
                 <div className="flex-1 h-px bg-[var(--ink)]" />
                 <span className="text-[var(--ink)] text-[9px] font-mono tracking-[0.22em]">NELLO LABS</span>
               </div>
+
+              <p className="text-xs lg:text-sm text-[var(--muted)] mt-4 leading-relaxed font-mono max-w-md">
+                Your AI Chief Operations Officer that actually gets sh*t done.
+              </p>
             </div>
           </div>
 
