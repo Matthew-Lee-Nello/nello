@@ -9,9 +9,19 @@ INSTALL="${NC_INSTALL_PATH:-$HOME/nello-claw}"
 # Read stdin payload (model, tokens_used, cache_read, cwd, etc.)
 PAYLOAD=$(cat 2>/dev/null || echo '{}')
 
-MODEL=$(echo "$PAYLOAD" | grep -oE '"model":\s*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-TOKENS=$(echo "$PAYLOAD" | grep -oE '"input_tokens":\s*[0-9]+' | head -1 | grep -oE '[0-9]+')
-CACHE=$(echo "$PAYLOAD" | grep -oE '"cache_read_input_tokens":\s*[0-9]+' | head -1 | grep -oE '[0-9]+')
+# Prefer jq for JSON parsing. The old grep/sed extraction broke on escaped
+# quotes and nested objects (e.g. when a payload field contained `"model":"x"`
+# inside a string). The .js sibling is the canonical statusline; this .sh
+# is a fallback for the bash-only path.
+if command -v jq >/dev/null 2>&1; then
+  MODEL=$(printf '%s' "$PAYLOAD" | jq -r '.model // empty')
+  TOKENS=$(printf '%s' "$PAYLOAD" | jq -r '.input_tokens // empty')
+  CACHE=$(printf '%s' "$PAYLOAD" | jq -r '.cache_read_input_tokens // empty')
+else
+  MODEL=$(echo "$PAYLOAD" | grep -oE '"model":\s*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+  TOKENS=$(echo "$PAYLOAD" | grep -oE '"input_tokens":\s*[0-9]+' | head -1 | grep -oE '[0-9]+')
+  CACHE=$(echo "$PAYLOAD" | grep -oE '"cache_read_input_tokens":\s*[0-9]+' | head -1 | grep -oE '[0-9]+')
+fi
 
 MODEL_SHORT="${MODEL:-?}"
 case "$MODEL_SHORT" in

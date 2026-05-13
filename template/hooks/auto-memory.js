@@ -14,6 +14,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { createHash } from 'node:crypto'
 
 const raw = readFileSync(0, 'utf-8').trim()
 if (!raw) process.exit(0)
@@ -59,8 +60,12 @@ const slug = prompt.toLowerCase()
   .slice(0, 4)
   .join('_') || 'note'
 
+// 6-char prompt hash so two prompts with the same first-4-long-words on the
+// same day don't silently overwrite each other. Previous behaviour: existsSync
+// → exit 0, second prompt dropped. Now each unique prompt gets its own file.
+const hash = createHash('sha256').update(prompt).digest('hex').slice(0, 6)
 const ts = new Date().toISOString().slice(0, 10)
-const fname = `${type}_${slug}_${ts}.md`
+const fname = `${type}_${slug}_${ts}_${hash}.md`
 const fpath = join(memDir, fname)
 
 if (existsSync(fpath)) process.exit(0)

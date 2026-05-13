@@ -5,8 +5,8 @@
  * Skips silently if graphify is not installed.
  */
 
-import { readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, existsSync, realpathSync } from 'node:fs'
+import { join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { execFile } from 'node:child_process'
 
@@ -26,9 +26,26 @@ const envPath = join(INSTALL, '.env')
 if (!existsSync(envPath)) process.exit(0)
 const envText = readFileSync(envPath, 'utf-8')
 const match = envText.match(/^VAULT_PATH=(.+)$/m)
-const vaultPath = match ? match[1].replace(/^["']|["']$/g, '') : null
-if (!vaultPath || !touched.startsWith(vaultPath)) process.exit(0)
+const vaultPath = match ? match[1].replace(/^["']|["']$/g, '').trim() : null
+if (!vaultPath) process.exit(0)
 
-// Fire-and-forget incremental rebuild. Detached, output suppressed.
-execFile('graphify', ['rebuild', '--incremental'], { cwd: vaultPath, detached: true, stdio: 'ignore' }, () => {})
+// Real path-prefix check. The previous startsWith comparison let
+// `/Users/x/vault-evil/note.md` pass when VAULT_PATH was `/Users/x/vault`
+// (a classic prefix-confusion bug) and treated unresolved symlink-traversal
+// paths as inside-vault. Normalise both sides and require an exact match
+// or path-separator boundary.
+function resolveSafely(p) {
+  try { return realpathSync(p) } catch { return resolve(p) }
+}
+const touchedReal = resolveSafely(touched)
+const vaultReal = resolveSafely(vaultPath)
+if (touchedReal !== vaultReal && !touchedReal.startsWith(vaultReal + sep)) process.exit(0)
+
+// Fire-and-forget incremental rebuild. Detached, but log non-zero exits to
+// stderr so a missing/poisoned `graphify` binary doesn't fail silently.
+execFile('graphify', ['rebuild', '--incremental'], { cwd: vaultReal, detached: true, stdio: 'ignore' }, (err) => {
+  if (err && process.env.NC_GRAPHIFY_HOOK_DEBUG) {
+    process.stderr.write(`graphify-incremental: ${err.message?.split('\n')[0] || 'unknown error'}\n`)
+  }
+})
 process.exit(0)
