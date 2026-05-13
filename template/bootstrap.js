@@ -22,6 +22,7 @@ import { homedir } from 'node:os'
 import { execSync, spawnSync } from 'node:child_process'
 import Handlebars from 'handlebars'
 import { randomBytes } from 'node:crypto'
+import { renderMcpJson, renderClaudeDesktopConfig, renderSettingsJson } from './scripts/render-configs.js'
 
 // Use fileURLToPath so install paths with spaces (e.g. "/Users/foo/Work - Claude AI/")
 // don't end up percent-encoded. new URL(...).pathname keeps "%20" for spaces.
@@ -80,7 +81,7 @@ function toPosixPath(p) {
 }
 
 // One-line description per MCP. CLAUDE.md.hbs renders these as the
-// "## Installed MCPs" bullet list, so any MCP added to .mcp.json.hbs
+// "## Installed MCPs" bullet list, so any MCP added to render-configs.js
 // needs a row here too — otherwise the bullet shows the name with an
 // empty purpose.
 const MCP_PURPOSES = {
@@ -94,8 +95,8 @@ function buildContext(bundle) {
   const installPathPosix = toPosixPath(INSTALL_PATH)
   const vaultPathPosix = toPosixPath(bundle.vaultPath || join(INSTALL_PATH, 'vault'))
   const escapedPath = installPathPosix.replace(/^\//, '-').replace(/\//g, '-')
-  // `mcps` stays a boolean map ({google: true, ...}) because .mcp.json.hbs
-  // does {{#if mcps.google}} checks. CLAUDE.md.hbs needs a real list to
+  // `mcps` stays a boolean map ({google: true, ...}) because render-configs.js
+  // does `if (mcps.google)` checks. CLAUDE.md.hbs needs a real list to
   // iterate with {{#each mcpsList}}, so build that here as [{name, purpose}].
   const mcpsList = Object.entries(bundle.mcps || {})
     .filter(([, on]) => !!on)
@@ -201,10 +202,9 @@ function mergeSettingsJson(ctx) {
     process.exit(1)
   }
 
-  const newSettings = JSON.parse(Handlebars.compile(
-    readFileSync(join(TEMPLATE_DIR, 'hooks', 'settings.json.hbs'), 'utf-8'),
-    { noEscape: true }
-  )(ctx))
+  // Build settings via JS object + JSON.stringify, not Handlebars. installPath
+  // can contain quotes/backslashes/newlines that would break the JSON output.
+  const newSettings = renderSettingsJson(ctx)
 
   let existing = {}
   if (existsSync(settingsPath)) {
@@ -321,7 +321,7 @@ function createWindowsShortcuts() {
 }
 
 function installUv() {
-  // uv ships uvx, which `template/.mcp.json.hbs` calls to run `workspace-mcp`
+  // uv ships uvx, which the rendered .mcp.json calls to run `workspace-mcp`
   // (the Google Workspace MCP). Without uv, Google MCP fails with command not found.
   // Idempotent. Universal across all install entry paths.
   try { execSync('which uv', { stdio: 'pipe' }); ok('uv already installed'); return } catch {}
@@ -515,6 +515,68 @@ function detectStaleInstalls() {
   if (process.platform === 'linux') warn(`  systemctl --user disable --now ${LAUNCHAGENT_LABEL}; rm ~/.config/systemd/user/${LAUNCHAGENT_LABEL}.service`)
 }
 
+// Hand-rolled bundle schema check. Hosted wizard already produces well-shaped
+// bundles, but bundle.json is the trust boundary between the wizard host and
+// the customer machine — anything that lands in ~/Downloads can be replaced
+// or tampered with before install. Reject unknown top-level keys and bad
+// types so a hostile bundle can't smuggle extra data into context that later
+// drives file writes or process spawning.
+const BUNDLE_KNOWN_KEYS = new Set([
+  'name', 'assistantName', 'occupation', 'location', 'timezone', 'bio',
+  'projects', 'teamMembers', 'clients', 'mentors', 'tools',
+  'vaultPath', 'vaultPreset', 'graphifyEnabled',
+  'mcps', 'keys',
+  'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
+])
+function validateBundle(bundle) {
+  if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) {
+    fail('bundle.json must be a JSON object')
+    process.exit(1)
+  }
+  for (const key of Object.keys(bundle)) {
+    if (!BUNDLE_KNOWN_KEYS.has(key)) {
+      fail(`bundle.json contains unknown key: ${JSON.stringify(key)}. Refusing to proceed — re-download a fresh bundle from labs.nello.gg.`)
+      process.exit(1)
+    }
+  }
+  // Spot-check shapes for fields that get interpolated into paths or configs.
+  for (const k of ['vaultPath', 'vaultPreset', 'name', 'assistantName', 'bio', 'occupation']) {
+    if (bundle[k] !== undefined && typeof bundle[k] !== 'string') {
+      fail(`bundle.${k} must be a string, got ${typeof bundle[k]}`)
+      process.exit(1)
+    }
+  }
+  if (bundle.mcps !== undefined && (typeof bundle.mcps !== 'object' || Array.isArray(bundle.mcps))) {
+    fail('bundle.mcps must be a plain object map')
+    process.exit(1)
+  }
+  if (bundle.keys !== undefined && (typeof bundle.keys !== 'object' || Array.isArray(bundle.keys))) {
+    fail('bundle.keys must be a plain object map')
+    process.exit(1)
+  }
+}
+
+// Resolve the requested vault path and refuse anything outside the user's
+// home directory. Without this, `bundle.vaultPath = "/etc"` (or any other
+// shared system dir) makes mkdirSync + the vault-seeder write files outside
+// the install boundary documented in SECURITY.md.
+function validateVaultPath(vaultPath) {
+  // Don't realpath the leaf — it might not exist yet (vault is created later).
+  // Walk up to the first existing ancestor and realpath that.
+  let probe = resolve(vaultPath)
+  let depth = 0
+  while (!existsSync(probe) && dirname(probe) !== probe && depth < 64) {
+    probe = dirname(probe)
+    depth++
+  }
+  const realProbe = existsSync(probe) ? realpathSync(probe) : probe
+  const home = realpathSync(homedir())
+  if (realProbe !== home && !realProbe.startsWith(home + sep)) {
+    fail(`Refusing to seed vault outside home directory.\n    vaultPath: ${vaultPath}\n    resolved:  ${realProbe}\n    must be under: ${home}`)
+    process.exit(1)
+  }
+}
+
 async function main() {
   console.log(BANNER)
 
@@ -526,7 +588,9 @@ async function main() {
   detectStaleInstalls()
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
+  validateBundle(bundle)
   const ctx = buildContext(bundle)
+  validateVaultPath(ctx.vaultPath)
 
   // Upfront summary so user (and Claude in plan mode) sees every change before any of them happen.
   console.log(`${ACCENT}This bootstrap will make these changes:${RESET}`)
@@ -549,8 +613,12 @@ async function main() {
   renderTemplate(join(TEMPLATE_DIR, 'CLAUDE.md.hbs'), join(INSTALL_PATH, 'CLAUDE.md'), ctx)
   renderTemplate(join(TEMPLATE_DIR, 'AGENTS.md.hbs'), join(INSTALL_PATH, 'AGENTS.md'), ctx)
   renderTemplate(join(TEMPLATE_DIR, 'brain-context.md.hbs'), join(INSTALL_PATH, 'brain-context.md'), ctx)
-  renderTemplate(join(TEMPLATE_DIR, '.mcp.json.hbs'), join(INSTALL_PATH, '.mcp.json'), ctx)
-  renderTemplate(join(TEMPLATE_DIR, 'claude_desktop_config.json.hbs'), join(INSTALL_PATH, 'claude_desktop_config.json'), ctx)
+  // JSON configs go through JS object factories + JSON.stringify, not Handlebars.
+  // Handlebars HTML-escapes but does NOT JSON-string-escape, so any `"` or `\`
+  // or newline in installPath / vaultPath / env values used to break these
+  // configs or inject extra args/env structure into spawned MCP processes.
+  writeFileSync(join(INSTALL_PATH, '.mcp.json'), JSON.stringify(renderMcpJson(ctx), null, 2))
+  writeFileSync(join(INSTALL_PATH, 'claude_desktop_config.json'), JSON.stringify(renderClaudeDesktopConfig(ctx), null, 2))
   writeEnv(bundle)
   ok('CLAUDE.md, AGENTS.md, brain-context.md, .env, .mcp.json, claude_desktop_config.json')
 

@@ -75,7 +75,7 @@ del %USERPROFILE%\Downloads\nello-claw-bundle.json
 
 2. Read these files in this repo before installing:
    - [`template/bootstrap.js`](template/bootstrap.js) — the install script
-   - [`template/hooks/settings.json.hbs`](template/hooks/settings.json.hbs) — what gets written to project settings
+   - [`template/scripts/render-configs.js`](template/scripts/render-configs.js) — what gets written to `.mcp.json`, `claude_desktop_config.json`, and project-scoped `.claude/settings.json`
    - [`template/CLAUDE.md.hbs`](template/CLAUDE.md.hbs) — your assistant's persona
    - [`installer/install.sh`](installer/install.sh) / [`installer/install.ps1`](installer/install.ps1) — only used if you take the bash/PowerShell fallback path
 

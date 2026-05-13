@@ -34,14 +34,43 @@ function ymd(date) {
 const today = ymd(new Date())
 const yesterday = ymd(new Date(Date.now() - 86400000))
 
+// Per-file and aggregate caps stop a pathologically large vault file from
+// blowing the SessionStart hook budget (and Claude's context window). A user
+// who lets MEMORY.md or Inbox.md grow to thousands of lines used to inject
+// the entire file into every new session, every time.
+const PER_FILE_LINES = 200
+const PER_FILE_BYTES = 32 * 1024
+const TOTAL_BYTES_CAP = 192 * 1024
+
+let totalEmitted = 0
+
 function emitFile(label, path, head = 0) {
   if (!existsSync(path)) return
-  console.log(`## ${label}`)
-  let body = readFileSync(path, 'utf-8')
-  if (head > 0) {
-    body = body.split('\n').slice(0, head).join('\n')
+  if (totalEmitted >= TOTAL_BYTES_CAP) {
+    console.log(`## ${label}\n_(skipped — SessionStart injection budget exhausted)_\n`)
+    return
   }
+  let body = readFileSync(path, 'utf-8')
+  const effectiveLineCap = head > 0 ? Math.min(head, PER_FILE_LINES) : PER_FILE_LINES
+  const lines = body.split('\n')
+  let truncated = false
+  if (lines.length > effectiveLineCap) {
+    body = lines.slice(0, effectiveLineCap).join('\n')
+    truncated = true
+  }
+  if (body.length > PER_FILE_BYTES) {
+    body = body.slice(0, PER_FILE_BYTES)
+    truncated = true
+  }
+  const remaining = TOTAL_BYTES_CAP - totalEmitted
+  if (body.length > remaining) {
+    body = body.slice(0, remaining)
+    truncated = true
+  }
+  totalEmitted += body.length
+  console.log(`## ${label}`)
   console.log(body)
+  if (truncated) console.log(`\n_(truncated by SessionStart hook — open ${path} for the full file)_`)
   console.log('')
 }
 

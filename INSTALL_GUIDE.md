@@ -109,7 +109,7 @@ Remove-Item "$HOME\Desktop\nello-claw.lnk", "$env:APPDATA\Microsoft\Windows\Star
 ## How to verify before installing
 
 1. Read [`template/bootstrap.js`](template/bootstrap.js) - that is the install script
-2. Read [`template/hooks/settings.json.hbs`](template/hooks/settings.json.hbs) - what gets written to project settings
+2. Read [`template/scripts/render-configs.js`](template/scripts/render-configs.js) - what gets written to `.mcp.json`, `claude_desktop_config.json`, and `.claude/settings.json`
 3. Read [`template/CLAUDE.md.hbs`](template/CLAUDE.md.hbs) - what gets written as your assistant's persona
 4. Use Plan Mode in Claude Code (Shift+Tab twice) - your assistant will summarise everything before running
 
