@@ -50,21 +50,36 @@ a:hover { color: var(--accent-strong); text-decoration: underline; text-underlin
 
 .font-serif { font-family: var(--font-instrument-serif), 'Iowan Old Style', 'Apple Garamond', Georgia, serif; }
 
-input[type="text"], input[type="email"], input[type="password"], textarea, select {
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+textarea,
+select {
   width: 100%;
-  background: var(--panel);
+  background: #FFFFFF;
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 10px 12px;
+  border: 2px solid rgba(20, 17, 14, 0.45);
+  border-radius: 8px;
+  padding: 14px 16px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.4;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 0 rgba(20, 17, 14, 0.08), 0 2px 6px -2px rgba(20, 17, 14, 0.08);
+  appearance: none;
+  -webkit-appearance: none;
+}
+input::placeholder, textarea::placeholder {
+  color: rgba(20, 17, 14, 0.42);
+  opacity: 1;
+}
+input:hover, textarea:hover, select:hover {
+  border-color: rgba(20, 17, 14, 0.7);
 }
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim), 0 1px 2px rgba(20, 17, 14, 0.08);
 }
-textarea { resize: vertical; min-height: 72px; }
+textarea { resize: vertical; min-height: 110px; }
 
 button {
   background: var(--ink);
@@ -133,16 +148,89 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .screen h3 { font-size: 15px; margin: 24px 0 12px; font-weight: 600; }
 .screen .intro { color: var(--muted); margin-bottom: 28px; }
 
-.field { margin-bottom: 20px; }
+.field { margin-bottom: 22px; }
 .field label {
   display: block;
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 6px;
-  font-weight: 500;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ─── Wizard mobile breakpoint ─── */
+@media (max-width: 768px) {
+  .wizard {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 20px 14px;
+  }
+  .wizard-nav {
+    position: relative;
+    top: 0;
+  }
+  .wizard-nav ol {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .wizard-nav li {
+    flex: 1 0 auto;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .wizard-nav li.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .wizard-nav li.done {
+    border-color: var(--accent);
+    opacity: 0.5;
+  }
+  .screen {
+    padding: 22px 18px;
+    border-radius: 10px;
+  }
+  .screen h2 {
+    font-size: 22px;
+  }
+  .screen h3 {
+    font-size: 14px;
+  }
+  .row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .nav-buttons {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  .nav-buttons button {
+    width: 100%;
+    padding: 14px 22px;
+  }
+  .panel-help {
+    font-size: 12.5px;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+  textarea,
+  select {
+    font-size: 16px; /* prevent iOS auto-zoom on focus */
+    padding: 14px 14px;
+    border-width: 2px;
+  }
+  .field { margin-bottom: 18px; }
+  .field label { font-size: 14px; margin-bottom: 7px; }
+}
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {

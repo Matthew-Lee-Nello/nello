@@ -29,7 +29,7 @@ export default function Screen1Identity() {
         <input
           value={bundle.occupation}
           onChange={e => update({ occupation: e.target.value })}
-          placeholder="e.g. buyer's agent in Brisbane / indie hacker / founder of X"
+          placeholder="I help 7/8 figure companies implement AI without dependency"
         />
       </div>
 

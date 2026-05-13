@@ -49,9 +49,19 @@ export default function HeroAscii() {
         {' '}<span className="text-[var(--ink)]/60">@</span> NELLO LABS
       </div>
 
-      {/* Copyright — bottom-right */}
-      <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
-        © NELLO LABS 2026
+      {/* Copyright + VirusTotal trust link — bottom-right */}
+      <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 flex flex-col items-end gap-1">
+        <a
+          href="https://www.virustotal.com/gui/url/289f3e236421cc2ce3a718f237346781beb8d9ff00b3865fee6f6702c7a4b4dd"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[var(--ink)] hover:text-[var(--accent)] transition-colors group"
+          title="Independently scanned by VirusTotal — click to view report"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] group-hover:bg-[var(--accent)] transition-colors" />
+          VERIFIED ON VIRUSTOTAL ↗
+        </a>
+        <span>© NELLO LABS 2026</span>
       </div>
 
       {/* Hero — content + mark, centred together as one group */}
