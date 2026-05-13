@@ -75,13 +75,12 @@ export default function HeroAscii() {
                   YOUR
                   <span className="block text-[var(--ink)] mt-1 lg:mt-2 opacity-95">
                     <Typewriter
-                      text={['24/7 EA']}
+                      text={['24/7 EA', 'AI COO', 'SECOND BRAIN']}
                       speed={90}
                       deleteSpeed={50}
                       waitTime={2200}
                       cursorChar="_"
                       cursorClassName="ml-0"
-                      loop={false}
                     />
                   </span>
                 </h1>
