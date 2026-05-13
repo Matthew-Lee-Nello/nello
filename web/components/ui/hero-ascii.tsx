@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Typewriter } from '@/components/ui/typewriter'
 import { ClaudeBuddy } from '@/components/ui/claude-buddy'
+import { GuideToast } from '@/components/ui/guide-toast'
 
 // Claude mark — official path from claude.ai/favicon.svg (Anthropic Crail #D97757)
 const claudePath =
@@ -49,19 +50,9 @@ export default function HeroAscii() {
         {' '}<span className="text-[var(--ink)]/60">@</span> NELLO LABS
       </div>
 
-      {/* Copyright + VirusTotal trust link — bottom-right */}
-      <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 flex flex-col items-end gap-1">
-        <a
-          href="https://www.virustotal.com/gui/url-analysis/u-3d34654f8235ae827d8532f2266fca7c37b85265c0a70fd0098d0028605dd061-bc5c3474"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-[var(--ink)] hover:text-[var(--accent)] transition-colors group"
-          title="Independently scanned by VirusTotal — click to view report"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] group-hover:bg-[var(--accent)] transition-colors" />
-          VERIFIED ON VIRUSTOTAL ↗
-        </a>
-        <span>© NELLO LABS 2026</span>
+      {/* Copyright — bottom-right */}
+      <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
+        © NELLO LABS 2026
       </div>
 
       {/* Hero — content + mark, centred together as one group */}
@@ -135,6 +126,17 @@ export default function HeroAscii() {
               <p className="text-xs lg:text-sm text-[var(--muted)] mt-4 leading-relaxed font-mono max-w-md">
                 Your AI Chief Operations Officer that actually gets sh*t done.
               </p>
+
+              <a
+                href="https://www.virustotal.com/gui/url-analysis/u-3d34654f8235ae827d8532f2266fca7c37b85265c0a70fd0098d0028605dd061-bc5c3474"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Independently scanned by VirusTotal — click to view report"
+                className="mt-3 inline-flex items-center gap-1.5 text-[10px] lg:text-[11px] font-mono tracking-[0.18em] text-[var(--ink)] opacity-80 hover:opacity-100 hover:text-[var(--accent)] transition-colors group"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] group-hover:bg-[var(--accent)] transition-colors" />
+                VERIFIED ON VIRUSTOTAL ↗
+              </a>
             </div>
           </div>
 
@@ -206,6 +208,8 @@ export default function HeroAscii() {
           .dot-grid::before, .dot-grid::after { animation: none; }
         }
       `}</style>
+
+      <GuideToast />
     </main>
   )
 }
