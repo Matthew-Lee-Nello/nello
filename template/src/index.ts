@@ -21,13 +21,21 @@ function acquireLock(): void {
   if (existsSync(PID_FILE)) {
     const oldPid = parseInt(readFileSync(PID_FILE, 'utf-8').trim(), 10)
     if (oldPid && oldPid !== process.pid) {
-      try {
-        process.kill(oldPid, 0)
-        logger.warn({ oldPid }, 'killing stale instance')
-        try { process.kill(oldPid, 'SIGTERM') } catch {}
-      } catch {
-        // Process not running, lock is stale
+      let alive = false
+      try { process.kill(oldPid, 0); alive = true } catch { /* not running */ }
+      if (alive) {
+        // Don't SIGTERM by PID. Mac and Linux recycle PIDs quickly — sending
+        // SIGTERM to whatever owns `oldPid` was a kill-the-wrong-process
+        // primitive (e.g. a vim editor that picked up the recycled PID).
+        // Refuse to start and leave manual recovery to the operator — the
+        // service manager (launchctl/Startup folder/systemd) handles legitimate
+        // restarts by stopping the old instance before launching the new one.
+        logger.error({ oldPid, pidFile: PID_FILE }, 'another process holds the PID file, refusing to start')
+        process.stderr.write(`\n[nello-claw] PID file ${PID_FILE} is held by process ${oldPid}.\n[nello-claw] If you are certain that is a stale entry pointing at an unrelated PID, remove ${PID_FILE} and rerun.\n[nello-claw] If a real daemon is running, stop it first via your service manager.\n\n`)
+        process.exit(1)
       }
+      // pid not alive → stale lock, safe to overwrite
+      logger.warn({ oldPid }, 'removing stale PID file')
     }
   }
   writeFileSync(PID_FILE, String(process.pid))

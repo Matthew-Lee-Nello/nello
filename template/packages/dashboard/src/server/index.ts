@@ -23,10 +23,35 @@ export interface DashboardHandle {
 // Re-export for any consumer that wants to push events from outside the routes.
 export { sendToChat, broadcastLog } from './ws-broadcast.js'
 
+// Loopback origins the dashboard frontend is allowed to come from. The CORS
+// middleware uses this list to set headers; the same list backs the Origin
+// guard below, which rejects state-changing requests from any other browser
+// origin (e.g. evil.example pointing fetch() at http://localhost:3000).
+const ALLOWED_DASHBOARD_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+]
+
 export function startDashboard(): DashboardHandle {
   const app = express()
-  app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'] }))
+  app.use(cors({ origin: ALLOWED_DASHBOARD_ORIGINS }))
   app.use(express.json({ limit: '200mb' }))
+
+  // CSRF-by-Origin guard. CORS sets headers but the browser only enforces them
+  // for cross-origin XHR fetches; HTML form POSTs and SSE/WS upgrades aren't
+  // protected by CORS. This middleware refuses state-changing requests whose
+  // Origin header is present and not in the allow-list. GET/HEAD/OPTIONS are
+  // CSRF-safe per spec. Requests with no Origin (curl, server-to-server,
+  // same-origin nav) pass through.
+  app.use('/api/', (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next()
+    const origin = req.get('origin')
+    if (!origin) return next()
+    if (ALLOWED_DASHBOARD_ORIGINS.includes(origin)) return next()
+    res.status(403).json({ error: 'origin not allowed' })
+  })
 
   app.use('/api/chat', chatRouter())
   app.use('/api/cron', cronRouter())
@@ -59,9 +84,28 @@ export function startDashboard(): DashboardHandle {
     ws.on('close', () => { subs.delete(sub) })
   })
 
-  // Tap pino so every log line streams to subscribed clients.
+  // Tap pino so every log line streams to subscribed clients, but redact the
+  // structured fields before broadcasting. Raw pino fields routinely include
+  // stack traces, absolute paths, secret bodies in error objects, and other
+  // metadata that should not land in any local browser tab that opens the
+  // dashboard. Allow-list small, primitive identifiers and surface error
+  // type only (not stack/path content).
+  const SAFE_LOG_FIELDS = new Set(['chatId', 'attempt', 'port', 'code', 'status', 'id', 'count'])
   const removeTap = addLogTap((e) => {
-    broadcastLog(e.level, e.msg, e.fields, e.ts)
+    const safe: Record<string, unknown> = {}
+    for (const k of SAFE_LOG_FIELDS) {
+      const v = e.fields[k]
+      if (v === undefined) continue
+      const t = typeof v
+      if (t === 'string' || t === 'number' || t === 'boolean') safe[k] = v
+    }
+    if (e.fields.err && typeof e.fields.err === 'object' && e.fields.err !== null) {
+      const err = e.fields.err as { message?: unknown; name?: unknown }
+      const m = typeof err.message === 'string' ? err.message : ''
+      // First line only, length-capped, no stack and no file paths.
+      safe.errType = (typeof err.name === 'string' ? err.name + ': ' : '') + m.split('\n')[0].slice(0, 120)
+    }
+    broadcastLog(e.level, e.msg, safe, e.ts)
   })
 
   let actualPort = DASHBOARD_PORT

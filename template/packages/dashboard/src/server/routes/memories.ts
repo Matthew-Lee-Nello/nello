@@ -12,13 +12,28 @@ interface MemoryRow {
   accessed_at: number
 }
 
+// Coerce + clamp salience. Rejects NaN/Infinity/negatives instead of letting
+// them flow into the decay logic, which treats salience as a finite [0,1]
+// probability. Previously `Number(salience)` happily produced NaN from
+// arbitrary JSON, and `typeof updates.salience === 'number'` accepted
+// Number.POSITIVE_INFINITY through to PATCH.
+function clampSalience(raw: unknown): number | null {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n)) return null
+  if (n < 0 || n > 1) return null
+  return n
+}
+
 export function memoriesRouter(): Router {
   const r = Router()
 
   // GET /api/memories - list with optional FTS search + sector filter + pagination
   r.get('/', (req, res) => {
     const q = String(req.query.q ?? '').trim()
-    const sector = String(req.query.sector ?? 'all') as 'semantic' | 'episodic' | 'all'
+    // Whitelist sector — never pass through query-string values into SQL.
+    const sectorRaw = String(req.query.sector ?? 'all')
+    const sector: 'semantic' | 'episodic' | 'all' =
+      sectorRaw === 'semantic' || sectorRaw === 'episodic' ? sectorRaw : 'all'
     const chatId = req.query.chatId ? String(req.query.chatId) : undefined
     const limit = Math.min(500, Math.max(1, Number(req.query.limit ?? 100)))
     const offset = Math.max(0, Number(req.query.offset ?? 0))
@@ -53,8 +68,13 @@ export function memoriesRouter(): Router {
 
     try {
       const rows = getDb().prepare(sql).all(...params) as MemoryRow[]
-      const totalSql = `SELECT COUNT(*) as c FROM memories ${sector !== 'all' ? "WHERE sector = '" + sector + "'" : ''}`
-      const total = (getDb().prepare(totalSql).get() as { c: number }).c
+      // Parameterise sector in the total count too. The previous string-concat
+      // form let `?sector=x' OR 1=1 --` break out of the SQL string. The
+      // sectorRaw whitelist above blocks that case, but parameterising removes
+      // the whole class so future changes can't reintroduce it.
+      const total = sector === 'all'
+        ? (getDb().prepare('SELECT COUNT(*) as c FROM memories').get() as { c: number }).c
+        : (getDb().prepare('SELECT COUNT(*) as c FROM memories WHERE sector = ?').get(sector) as { c: number }).c
       res.json({ memories: rows, total, limit, offset })
     } catch (err) {
       logger.error({ err }, 'memories list failed')
@@ -118,12 +138,14 @@ export function memoriesRouter(): Router {
     const { chat_id, content, sector = 'semantic', salience = 1.0, topic_key } = req.body ?? {}
     if (!chat_id || !content) { res.status(400).json({ error: 'chat_id + content required' }); return }
     if (sector !== 'semantic' && sector !== 'episodic') { res.status(400).json({ error: 'invalid sector' }); return }
+    const salienceClamped = clampSalience(salience)
+    if (salienceClamped === null) { res.status(400).json({ error: 'salience must be a finite number in [0, 1]' }); return }
     const now = Math.floor(Date.now() / 1000)
     try {
       const result = getDb().prepare(`
         INSERT INTO memories (chat_id, topic_key, content, sector, salience, created_at, accessed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(chat_id, topic_key ?? null, content, sector, Number(salience), now, now)
+      `).run(chat_id, topic_key ?? null, content, sector, salienceClamped, now, now)
       const row = getDb().prepare('SELECT * FROM memories WHERE id = ?').get(result.lastInsertRowid) as MemoryRow
       res.json(row)
     } catch (err) {
@@ -144,7 +166,11 @@ export function memoriesRouter(): Router {
     const values: (string | number | null)[] = []
     if (typeof updates.content === 'string') { fields.push('content = ?'); values.push(updates.content) }
     if (updates.sector === 'semantic' || updates.sector === 'episodic') { fields.push('sector = ?'); values.push(updates.sector) }
-    if (typeof updates.salience === 'number') { fields.push('salience = ?'); values.push(updates.salience) }
+    if (updates.salience !== undefined) {
+      const s = clampSalience(updates.salience)
+      if (s === null) { res.status(400).json({ error: 'salience must be a finite number in [0, 1]' }); return }
+      fields.push('salience = ?'); values.push(s)
+    }
     if (updates.topic_key !== undefined) { fields.push('topic_key = ?'); values.push(updates.topic_key) }
     if (fields.length === 0) { res.json(existing); return }
 

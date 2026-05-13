@@ -167,21 +167,31 @@ export function chatRouter(): Router {
   })
 
   // File upload — multipart, saves under <STORE>/uploads/<chatId>/, returns metadata.
-  r.post('/:id/upload', upload.array('files', 10), (req, res) => {
-    const chatId = req.params.id
-    const chatRow = getDb().prepare('SELECT id FROM dashboard_chats WHERE id = ? AND archived_at IS NULL').get(chatId) as { id: string } | undefined
-    if (!chatRow) { res.status(404).json({ error: `chat not found: ${chatId}` }); return }
-
-    const files = (req.files as Express.Multer.File[] | undefined) ?? []
-    const meta = files.map(f => ({
-      name: f.originalname,
-      saved: f.filename,
-      path: f.path,
-      size: f.size,
-      mime: f.mimetype,
-    }))
-    res.json({ files: meta })
-  })
+  // The chat-existence pre-check runs BEFORE multer parses the body, otherwise
+  // multer's diskStorage destination callback mkdir's <UPLOADS_ROOT>/<chatId>/
+  // for any caller-supplied id — including nonexistent ones — before the route
+  // handler can 404.
+  r.post(
+    '/:id/upload',
+    (req, res, next) => {
+      const chatRow = getDb().prepare('SELECT id FROM dashboard_chats WHERE id = ? AND archived_at IS NULL').get(req.params.id) as { id: string } | undefined
+      if (!chatRow) { res.status(404).json({ error: `chat not found: ${req.params.id}` }); return }
+      next()
+    },
+    upload.array('files', 10),
+    (req, res) => {
+      const files = (req.files as Express.Multer.File[] | undefined) ?? []
+      // Don't return `f.path` — that's the absolute disk path inside <STORE>/uploads/,
+      // which leaks the server's filesystem layout to any local API caller.
+      const meta = files.map(f => ({
+        name: f.originalname,
+        saved: f.filename,
+        size: f.size,
+        mime: f.mimetype,
+      }))
+      res.json({ files: meta })
+    },
+  )
 
   r.post('/:id/message', async (req, res) => {
     const chatId = req.params.id

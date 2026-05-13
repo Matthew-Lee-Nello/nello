@@ -92,6 +92,10 @@ export function initDatabase(db: Database.Database = getDb()): void {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_tasks_due ON scheduled_tasks(status, next_run);
+    -- Migration: claimed_at lease column. Added 2026-05 to atomically claim due
+    -- tasks (UPDATE ... RETURNING) instead of read-then-update. Existing DBs
+    -- get the column added below; new DBs would already have it after a
+    -- future schema rev but we keep the ALTER for back-compat installs.
 
     CREATE TABLE IF NOT EXISTS dashboard_chats (
       id TEXT PRIMARY KEY,
@@ -113,6 +117,16 @@ export function initDatabase(db: Database.Database = getDb()): void {
     );
     CREATE INDEX IF NOT EXISTS idx_messages_chat ON dashboard_messages(chat_id, created_at);
   `)
+
+  // Idempotent column add for the scheduled_tasks lease. better-sqlite3 throws
+  // on duplicate column; swallow that specific case so initDatabase stays
+  // safe to call on both fresh and upgraded DBs.
+  try {
+    db.exec('ALTER TABLE scheduled_tasks ADD COLUMN claimed_at INTEGER')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (!/duplicate column name/i.test(msg)) throw err
+  }
 
   logger.info('Database initialised')
 }
@@ -241,6 +255,52 @@ export function getDueTasks(): Task[] {
     SELECT * FROM scheduled_tasks
     WHERE status = 'active' AND next_run <= ?
   `).all(now) as Task[]
+}
+
+// Stale-claim threshold. If a process crashed mid-task, the lease can be
+// re-claimed after this many seconds. Long enough to cover most legitimate
+// long-running prompts, short enough that a dead daemon doesn't park a task
+// forever.
+const TASK_CLAIM_TTL_SECONDS = 60 * 60
+
+// Atomically claim every due task in one statement. The previous read-then-
+// update flow had two race windows: (a) two scheduler ticks (or two daemon
+// processes) could both pick up the same row, and (b) a crash between the
+// pre-run next_run bump and the actual runAgent() left the task permanently
+// skipped. UPDATE ... RETURNING claims and reads in the same atomic write.
+export function claimDueTasks(): Task[] {
+  const now = Math.floor(Date.now() / 1000)
+  const staleCutoff = now - TASK_CLAIM_TTL_SECONDS
+  return getDb().prepare(`
+    UPDATE scheduled_tasks
+       SET claimed_at = ?, last_run = ?
+     WHERE status = 'active'
+       AND next_run <= ?
+       AND (claimed_at IS NULL OR claimed_at < ?)
+     RETURNING *
+  `).all(now, now, now, staleCutoff) as Task[]
+}
+
+// Release a claim after the task body finishes (success or error). Bumps
+// next_run and writes last_result. Does not touch status, so a /api/cron
+// pause that arrived mid-run survives the release.
+export function releaseTask(id: string, nextRun: number, result: string): void {
+  getDb().prepare(`
+    UPDATE scheduled_tasks
+       SET next_run = ?, last_result = ?, claimed_at = NULL
+     WHERE id = ?
+  `).run(nextRun, result, id)
+}
+
+// On scheduler boot: surface and clear any stale claims left behind by a
+// crashed prior process. Returns the number of rows released.
+export function recoverStaleClaims(): number {
+  const cutoff = Math.floor(Date.now() / 1000) - TASK_CLAIM_TTL_SECONDS
+  const r = getDb().prepare(`
+    UPDATE scheduled_tasks SET claimed_at = NULL
+     WHERE claimed_at IS NOT NULL AND claimed_at < ?
+  `).run(cutoff)
+  return r.changes
 }
 
 export function updateTaskAfterRun(id: string, nextRun: number, result: string): void {
