@@ -26,10 +26,16 @@ export function LeadCaptureModal({ open, onClose, onSubmitted }: Props) {
   useEffect(() => {
     if (!open) return
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== FORM_ORIGIN) return
+      const sameOrigin = typeof window !== 'undefined' && e.origin === window.location.origin
+      if (e.origin !== FORM_ORIGIN && !sameOrigin) return
       const data = e.data
       const type = typeof data === 'string' ? data : data?.type || data?.event
-      if (typeof type === 'string' && /submit|success|complete/i.test(type)) {
+      if (typeof type !== 'string') return
+      if (sameOrigin && type === 'nello-lead-submitted') {
+        onSubmitted()
+        return
+      }
+      if (e.origin === FORM_ORIGIN && /submit|success|complete/i.test(type)) {
         onSubmitted()
       }
     }

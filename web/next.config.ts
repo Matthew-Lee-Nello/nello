@@ -15,7 +15,7 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
   "connect-src 'self' https://booking.nello.gg",
-  "frame-src https://booking.nello.gg",
+  "frame-src 'self' https://booking.nello.gg",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",
@@ -30,12 +30,24 @@ const SECURITY_HEADERS = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
 ]
 
+// /lead-captured is the GHL post-submit redirect target. The iframe inside our
+// lead-capture modal navigates here, so it must allow same-origin framing.
+const LEAD_CAPTURED_CSP = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+const LEAD_CAPTURED_HEADERS = [
+  { key: 'Content-Security-Policy', value: LEAD_CAPTURED_CSP },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+]
+
 const config: NextConfig = {
   reactStrictMode: true,
   experimental: { typedRoutes: true },
   async headers() {
     return [
       { source: '/:path*', headers: SECURITY_HEADERS },
+      { source: '/lead-captured', headers: LEAD_CAPTURED_HEADERS },
     ]
   },
 }
