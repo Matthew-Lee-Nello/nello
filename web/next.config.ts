@@ -5,13 +5,17 @@ import type { NextConfig } from 'next'
 // `'unsafe-inline'` on style-src is required by Next's inline injected styles;
 // every other directive is locked down. Adjust the connect-src list if/when a
 // real /api endpoint needs an upstream call.
+// Next dev mode uses eval() for HMR; allow it only in development.
+const isDev = process.env.NODE_ENV !== 'production'
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://booking.nello.gg`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self'",
+  "connect-src 'self' https://booking.nello.gg",
+  "frame-src https://booking.nello.gg",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",

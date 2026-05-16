@@ -1,8 +1,12 @@
 'use client'
 
-import Link from 'next/link'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Typewriter } from '@/components/ui/typewriter'
 import { ClaudeBuddy } from '@/components/ui/claude-buddy'
+import { LeadCaptureModal } from '@/components/ui/lead-capture-modal'
+
+const LEAD_KEY = 'nello-lead-captured'
 
 // Claude mark — official path from claude.ai/favicon.svg (Anthropic Crail #D97757)
 const claudePath =
@@ -24,6 +28,24 @@ function ClaudeMark({ size = 280 }: { size?: number }) {
 }
 
 export default function HeroAscii() {
+  const router = useRouter()
+  const [pending, setPending] = useState<null | '/wizard' | '/audit'>(null)
+
+  const go = (dest: '/wizard' | '/audit') => {
+    if (typeof window !== 'undefined' && localStorage.getItem(LEAD_KEY) === '1') {
+      router.push(dest)
+      return
+    }
+    setPending(dest)
+  }
+
+  const onSubmitted = () => {
+    try { localStorage.setItem(LEAD_KEY, '1') } catch {}
+    const dest = pending
+    setPending(null)
+    if (dest) router.push(dest)
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[var(--bg)] text-[var(--ink)]">
       {/* Dot grid backdrop — uniform ASCII-style dots, no Vitruvian man, no JS */}
@@ -93,27 +115,25 @@ export default function HeroAscii() {
               </div>
 
               <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
-                <Link href="/wizard" className="contents">
-                  <button
-                    type="button"
-                    className="relative px-5 lg:px-6 py-2 lg:py-2.5 bg-transparent text-[var(--ink)] font-mono text-xs lg:text-sm border border-[var(--ink)] hover:bg-[var(--ink)] hover:text-[var(--bg)] transition-all duration-200 group rounded-none tracking-wider"
-                    style={{ letterSpacing: '0.12em' }}
-                  >
-                    <span className="hidden lg:block absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="hidden lg:block absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                    SET UP MY ASSISTANT
-                  </button>
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => go('/wizard')}
+                  className="relative px-5 lg:px-6 py-2 lg:py-2.5 bg-transparent text-[var(--ink)] font-mono text-xs lg:text-sm border border-[var(--ink)] hover:bg-[var(--ink)] hover:text-[var(--bg)] transition-all duration-200 group rounded-none tracking-wider"
+                  style={{ letterSpacing: '0.12em' }}
+                >
+                  <span className="hidden lg:block absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="hidden lg:block absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  SET UP MY ASSISTANT
+                </button>
 
-                <Link href="/audit" className="contents">
-                  <button
-                    type="button"
-                    className="relative px-5 lg:px-6 py-2 lg:py-2.5 bg-transparent border border-[var(--ink)]/60 text-[var(--ink)] font-mono text-xs lg:text-sm hover:bg-[var(--ink)] hover:text-[var(--bg)] transition-all duration-200 rounded-none tracking-wider"
-                    style={{ letterSpacing: '0.12em' }}
-                  >
-                    I HAVE CLAUDE CODE
-                  </button>
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => go('/audit')}
+                  className="relative px-5 lg:px-6 py-2 lg:py-2.5 bg-transparent border border-[var(--ink)]/60 text-[var(--ink)] font-mono text-xs lg:text-sm hover:bg-[var(--ink)] hover:text-[var(--bg)] transition-all duration-200 rounded-none tracking-wider"
+                  style={{ letterSpacing: '0.12em' }}
+                >
+                  I HAVE CLAUDE CODE
+                </button>
               </div>
 
               <div className="hidden lg:flex items-center gap-2 mt-8 opacity-50">
@@ -207,6 +227,12 @@ export default function HeroAscii() {
           .dot-grid::before, .dot-grid::after { animation: none; }
         }
       `}</style>
+
+      <LeadCaptureModal
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        onSubmitted={onSubmitted}
+      />
     </main>
   )
 }
