@@ -819,14 +819,27 @@ async function main() {
   console.log(`\n${ACCENT}✓ Done${RESET}\n`)
   console.log(`${ACCENT}What's set up:${RESET}`)
   console.log(`  • Dashboard at ${dashboardUrl}${DIM} ${dashboardOpened ? '(opening in your browser...)' : '(open it manually)'}${RESET}`)
-  if (_obsidianInstalled) {
-    console.log(`  • Obsidian vault at ${vaultPath}${DIM} ${vaultOpened ? '(opening in Obsidian...)' : '(open Obsidian.app, then File → Open Vault → pick this folder)'}${RESET}`)
-  } else {
-    console.log(`  • Obsidian vault at ${vaultPath}`)
-    console.log(`    ${DIM}Obsidian didn't install automatically. Install it from https://obsidian.md/download then File → Open Vault → pick the folder above.${RESET}`)
-  }
+  console.log(`  • Obsidian vault at ${vaultPath}${DIM} ${vaultOpened ? '(opening in Obsidian...)' : ''}${RESET}`)
   if (chatId) console.log(`  • Telegram bot linked to chat ${chatId}`)
   console.log(`  • ${skillCount} skills, ${mcpCount} MCP servers\n`)
+
+  // Explicit how-to-open-vault block. Peter is non-technical: spell out the
+  // folder location AND the manual open path so he can get back to it after
+  // the first auto-open if he closes Obsidian.
+  console.log(`${ACCENT}Your vault (your AI's long-term memory):${RESET}`)
+  console.log(`  • Lives at: ${ACCENT}${vaultPath}${RESET}`)
+  console.log(`  • Folder name inside Obsidian: ${ACCENT}vault${RESET} (sits inside your install folder)`)
+  if (_obsidianInstalled) {
+    console.log(`  • To re-open later: launch Obsidian → it remembers this vault, or File → Open Vault → pick the folder above`)
+    if (!vaultOpened) {
+      console.log(`    ${DIM}It didn't auto-open this time. Open Obsidian.app, then File → Open Vault → pick the folder above.${RESET}`)
+    }
+  } else {
+    console.log(`  • Obsidian didn't install automatically. Get it from ${ACCENT}https://obsidian.md/download${RESET}`)
+    console.log(`    Then open Obsidian → ${ACCENT}File → Open Vault${RESET} → pick the folder above`)
+  }
+  console.log(`  ${DIM}Inside you'll see: Inbox.md (capture anything), Journal/ (daily notes), Memory/ (your AI's auto-memory), MOC-*.md (maps of content).${RESET}\n`)
+
   if (!dashboardOpened) {
     console.log(`${DIM}If your browser didn't open: visit ${dashboardUrl} manually.${RESET}\n`)
   }
