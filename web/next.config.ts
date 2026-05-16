@@ -30,11 +30,11 @@ const SECURITY_HEADERS = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
 ]
 
-// /lead-captured is the GHL post-submit redirect target. The iframe inside our
+// /setup is the GHL post-submit redirect target. The iframe inside our
 // lead-capture modal navigates here, so it must allow same-origin framing.
-const LEAD_CAPTURED_CSP = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
-const LEAD_CAPTURED_HEADERS = [
-  { key: 'Content-Security-Policy', value: LEAD_CAPTURED_CSP },
+const SETUP_BRIDGE_CSP = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+const SETUP_BRIDGE_HEADERS = [
+  { key: 'Content-Security-Policy', value: SETUP_BRIDGE_CSP },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -47,7 +47,7 @@ const config: NextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: SECURITY_HEADERS },
-      { source: '/lead-captured', headers: LEAD_CAPTURED_HEADERS },
+      { source: '/setup', headers: SETUP_BRIDGE_HEADERS },
     ]
   },
 }

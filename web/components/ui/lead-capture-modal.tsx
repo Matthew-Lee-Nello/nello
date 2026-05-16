@@ -90,7 +90,7 @@ export function LeadCaptureModal({ open, onClose, onSubmitted }: Props) {
               </button>
             </div>
 
-            <div className="overflow-auto" style={{ height: 'min(560px, 80vh)' }}>
+            <div className="relative overflow-auto" style={{ height: 'min(560px, 80vh)' }}>
               <iframe
                 src={`${FORM_ORIGIN}/widget/form/${FORM_ID}`}
                 style={{ width: '100%', height: '100%', minHeight: 500, border: 'none', display: 'block' }}
@@ -105,6 +105,27 @@ export function LeadCaptureModal({ open, onClose, onSubmitted }: Props) {
                 data-form-id={FORM_ID}
                 title="labs.nello.gg form"
               />
+              <div
+                className="lead-spinner absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[var(--bg)] pointer-events-none"
+                aria-hidden="true"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+                <span className="text-[10px] tracking-[0.22em] uppercase text-[var(--muted)]">
+                  LOADING FORM…
+                </span>
+              </div>
+              <style jsx>{`
+                .lead-spinner {
+                  opacity: 1;
+                  animation: lead-spinner-out 0.3s ease-out 1.5s forwards;
+                }
+                @keyframes lead-spinner-out {
+                  to {
+                    opacity: 0;
+                    visibility: hidden;
+                  }
+                }
+              `}</style>
             </div>
           </motion.div>
 
