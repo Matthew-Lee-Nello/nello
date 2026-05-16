@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>NELLO LABS — Colour System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF7F2;
+    --panel: #F2EDE4;
+    --border: #E6DFD3;
+    --ink: #14110E;
+    --muted: #6B635A;
+    --accent: #C2872B;
+    --accent-strong: #A0701F;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 72px 80px;
+    width: 1240px;
+    min-height: 1754px;
+    position: relative;
+  }
+
+  /* Corner frame accents */
+  .corner { position: absolute; width: 36px; height: 36px; border: 2px solid var(--ink); opacity: 0.25; }
+  .corner.tl { top: 32px;    left: 32px;    border-right: 0;  border-bottom: 0; }
+  .corner.tr { top: 32px;    right: 32px;   border-left: 0;   border-bottom: 0; }
+  .corner.bl { bottom: 32px; left: 32px;    border-right: 0;  border-top: 0; }
+  .corner.br { bottom: 32px; right: 32px;   border-left: 0;   border-top: 0; }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin: 0 0 6px;
+    text-transform: uppercase;
+  }
+  .caption {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 0 0 20px;
+  }
+  .rule {
+    height: 1px;
+    background: var(--accent);
+    margin: 0 0 56px;
+  }
+
+  /* Section heading */
+  .section-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 56px 0 22px;
+  }
+  .section-heading .label {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .section-heading .num {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+  .section-heading .line {
+    flex: 1;
+    height: 1px;
+    background: var(--ink);
+    opacity: 0.2;
+  }
+
+  /* Swatch grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px 56px;
+  }
+  .swatch {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .swatch .block {
+    width: 100%;
+    height: 132px;
+    border-radius: 0;
+    /* Hairline border for very-light swatches so they don't disappear on cream */
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 14, 0.08);
+  }
+  .swatch .hex {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 0;
+  }
+  .swatch .desc {
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* Brand accents */
+  .accent-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px 56px;
+    margin-top: 24px;
+  }
+  .accent-row .block { height: 96px; }
+
+  /* Footer */
+  footer {
+    margin-top: 96px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Dim swatch needs visible bg for the alpha overlay */
+  .dim-wrap {
+    position: relative;
+    width: 100%;
+    height: 132px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 14, 0.08);
+  }
+  .dim-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(194, 135, 43, 0.10);
+  }
+</style>
+</head>
+<body>
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <div class="eyebrow">001 · DESIGN SYSTEM</div>
+  <h1>NELLO LABS — COLOUR SYSTEM</h1>
+  <p class="caption">labs.nello.gg · canonical brand palette · 2026</p>
+  <div class="rule"></div>
+
+  <div class="section-heading">
+    <span class="num">A</span>
+    <span class="label">CORE TOKENS</span>
+    <span class="line"></span>
+  </div>
+
+  <div class="grid">
+    <div class="swatch">
+      <div class="block" style="background:#FAF7F2"></div>
+      <p class="hex">#FAF7F2 · BG</p>
+      <p class="desc">WARM CREAM · PAGE BACKGROUND</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#F2EDE4"></div>
+      <p class="hex">#F2EDE4 · PANEL</p>
+      <p class="desc">LINEN · CARDS / WIZARD SCREEN</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#E6DFD3"></div>
+      <p class="hex">#E6DFD3 · BORDER</p>
+      <p class="desc">HAIRLINE WARM BORDER</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#14110E"></div>
+      <p class="hex">#14110E · INK</p>
+      <p class="desc">DEEP BROWN-BLACK · BODY TEXT</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#6B635A"></div>
+      <p class="hex">#6B635A · MUTED</p>
+      <p class="desc">WARM GREY · SECONDARY TEXT</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#C2872B"></div>
+      <p class="hex">#C2872B · ACCENT</p>
+      <p class="desc">BRASS · LINKS / FOCUS / STATUS</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#A0701F"></div>
+      <p class="hex">#A0701F · ACCENT STRONG</p>
+      <p class="desc">DEEPER BRASS · HOVER STATE</p>
+    </div>
+    <div class="swatch">
+      <div class="dim-wrap"></div>
+      <p class="hex">rgba(194,135,43,0.10) · ACCENT DIM</p>
+      <p class="desc">BRASS WASH · CALLOUT BACKGROUND</p>
+    </div>
+  </div>
+
+  <div class="section-heading">
+    <span class="num">B</span>
+    <span class="label">BRAND ACCENTS</span>
+    <span class="line"></span>
+  </div>
+
+  <div class="accent-row">
+    <div class="swatch">
+      <div class="block" style="background:#D97757"></div>
+      <p class="hex">#D97757 · ANTHROPIC CRAIL</p>
+      <p class="desc">CLAUDE MARK · CLAUDE CODE MASCOT</p>
+    </div>
+    <div class="swatch">
+      <div class="block" style="background:#16a34a"></div>
+      <p class="hex">#16A34A · SUCCESS GREEN</p>
+      <p class="desc">VERIFIED STATUS · LIVE INDICATOR</p>
+    </div>
+  </div>
+
+  <footer>
+    <span>∞ · NELLO LABS</span>
+    <span>© NELLO LABS 2026</span>
+  </footer>
+</body>
+</html>
