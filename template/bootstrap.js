@@ -755,16 +755,57 @@ async function main() {
     }
   }
 
-  // Auto-open browser. Ignore errors - if the user has no GUI, this is a no-op.
+  const vaultPath = join(INSTALL_PATH, 'vault')
+
+  // Auto-open dashboard + Obsidian vault. Both wrapped so failures don't abort
+  // install. Print fallback manual instructions either way so Peter knows what
+  // to do if the GUI handoff silently no-ops (headless box, missing default
+  // browser, Obsidian not in PATH, etc).
+  let dashboardOpened = false
   try {
     if (process.platform === 'darwin') {
       execSync(`open "${dashboardUrl}"`, { stdio: 'ignore' })
+      dashboardOpened = true
     } else if (process.platform === 'win32') {
       execSync(`start "" "${dashboardUrl}"`, { stdio: 'ignore', shell: 'cmd.exe' })
+      dashboardOpened = true
     } else {
       execSync(`xdg-open "${dashboardUrl}"`, { stdio: 'ignore' })
+      dashboardOpened = true
     }
   } catch {}
+
+  let vaultOpened = false
+  if (_obsidianInstalled) {
+    try {
+      if (process.platform === 'darwin') {
+        // `open -a Obsidian <folder>` launches Obsidian and prompts to open
+        // the folder as a vault on first run, then opens it directly on
+        // subsequent runs.
+        execSync(`open -a Obsidian "${vaultPath}"`, { stdio: 'ignore' })
+        vaultOpened = true
+      } else if (process.platform === 'win32') {
+        // Reuse the candidate paths from installObsidianApp so we launch the
+        // real exe with the vault as arg.
+        const exeCandidates = [
+          join(process.env.LOCALAPPDATA || '', 'Obsidian', 'Obsidian.exe'),
+          join(process.env.LOCALAPPDATA || '', 'Programs', 'Obsidian', 'Obsidian.exe'),
+          'C:\\Program Files\\Obsidian\\Obsidian.exe',
+          'C:\\Program Files (x86)\\Obsidian\\Obsidian.exe',
+        ]
+        const exe = exeCandidates.find(p => existsSync(p))
+        if (exe) {
+          execSync(`start "" "${exe}" "${vaultPath}"`, { stdio: 'ignore', shell: 'cmd.exe' })
+          vaultOpened = true
+        }
+      } else {
+        // Linux: try xdg-open on the folder. Obsidian's .desktop entry usually
+        // handles directory mime type when installed via AppImage/snap.
+        execSync(`xdg-open "${vaultPath}"`, { stdio: 'ignore' })
+        vaultOpened = true
+      }
+    } catch {}
+  }
 
   // Final summary - point user at the dashboard chat. They can ask Claude what's set up.
   let skillCount = 0, mcpCount = 0
@@ -774,14 +815,21 @@ async function main() {
     mcpCount = Object.keys(m.mcpServers || {}).length
   } catch {}
   const chatId = (bundle.keys?.ALLOWED_CHAT_ID ?? '').split(',')[0]?.trim()
-  const vaultPath = join(INSTALL_PATH, 'vault')
 
   console.log(`\n${ACCENT}✓ Done${RESET}\n`)
   console.log(`${ACCENT}What's set up:${RESET}`)
-  console.log(`  • Dashboard at ${dashboardUrl}${DIM} ${dashboardHealthy ? '(open)' : '(starting...)'}${RESET}`)
-  console.log(`  • Obsidian vault at ${vaultPath}${DIM} ${_obsidianInstalled ? '(open in Obsidian.app)' : '(install Obsidian from https://obsidian.md to view as a graph)'}${RESET}`)
+  console.log(`  • Dashboard at ${dashboardUrl}${DIM} ${dashboardOpened ? '(opening in your browser...)' : '(open it manually)'}${RESET}`)
+  if (_obsidianInstalled) {
+    console.log(`  • Obsidian vault at ${vaultPath}${DIM} ${vaultOpened ? '(opening in Obsidian...)' : '(open Obsidian.app, then File → Open Vault → pick this folder)'}${RESET}`)
+  } else {
+    console.log(`  • Obsidian vault at ${vaultPath}`)
+    console.log(`    ${DIM}Obsidian didn't install automatically. Install it from https://obsidian.md/download then File → Open Vault → pick the folder above.${RESET}`)
+  }
   if (chatId) console.log(`  • Telegram bot linked to chat ${chatId}`)
   console.log(`  • ${skillCount} skills, ${mcpCount} MCP servers\n`)
+  if (!dashboardOpened) {
+    console.log(`${DIM}If your browser didn't open: visit ${dashboardUrl} manually.${RESET}\n`)
+  }
   console.log(`${ACCENT}Next:${RESET}`)
   console.log(`  1. ${ACCENT}Run /nello-start${RESET} in this terminal (or in the dashboard chat) to begin onboarding`)
   console.log(`     ${DIM}If you don't see it, start a new chat. If you still don't, ask Claude to run it.${RESET}`)
