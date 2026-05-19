@@ -2,6 +2,7 @@
 name: nello-start
 description: NELLO post-install welcome + tour. Runs after the wizard bundle is pasted and the AI COO is live. Confirms what's running on Peter's machine (dashboard, Obsidian, Telegram, MCPs), introduces the framework prompt, hands off to /nello-build. Triggers on "/nello-start", "nello start", "start nello onboarding", or any first-run "what now" after install.
 trigger: /nello-start
+model_hint: fast
 ---
 
 # /nello-start - Welcome to your AI COO

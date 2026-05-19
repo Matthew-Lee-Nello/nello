@@ -7,7 +7,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 import {
   getDb, getSession, setSession, clearSession,
   buildMemoryContext, saveConversationTurn, runAgentStream,
-  STORE_DIR, logger,
+  STORE_DIR, logger, hintToModel,
 } from '@nc/core'
 import { sendToChat } from '../ws-broadcast.js'
 
@@ -47,7 +47,7 @@ Title:`
   const generator = query({
     prompt,
     options: {
-      model: 'claude-haiku-4-5',
+      model: hintToModel('summarize'),
       permissionMode: 'bypassPermissions',
     },
   })
