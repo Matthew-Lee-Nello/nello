@@ -1,6 +1,7 @@
 ---
 name: find-skill
 description: Discover, vet, and install agent skills in one flow. Use when the user asks "find a skill for X", "is there a skill that can...", "how do I do X" where X might be a skill, or expresses interest in extending capabilities. Combines vercel-labs/find-skills discovery with mandatory security vetting before install. Never installs a skill without auditing SKILL.md first.
+model_hint: fast
 ---
 
 # Find Skill

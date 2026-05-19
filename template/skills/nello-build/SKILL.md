@@ -2,6 +2,7 @@
 name: nello-build
 description: NELLO post-install build checklist. Five-section walkthrough that wires the four-bucket Gmail filter, Obsidian + wikilinks, MCPs in Telegram, /research with Exa, then teaches Peter to build his own skill (morning brief as worked example). Ends with the free Company Brain video CTA. Triggers on "/nello-build", "nello build", "build my features", "wire up my AI COO", or any post-/nello-start next-step.
 trigger: /nello-build
+model_hint: reasoning
 ---
 
 # /nello-build - Wire your first features

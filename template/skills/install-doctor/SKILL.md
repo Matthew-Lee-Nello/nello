@@ -2,6 +2,7 @@
 name: install-doctor
 description: End-to-end audit of a nello-claw install. Reports what's wired, what's broken, where it stalled, what permissions are stuck. Use when the dashboard isn't responding, the assistant says "(no response)", Obsidian or the Telegram bot aren't working, or the user just wants a sanity check. Triggers on "install doctor", "audit my install", "what's broken", "/install-doctor".
 trigger: /install-doctor
+model_hint: fast
 ---
 
 # /install-doctor - End-to-End Install Audit

@@ -2,6 +2,7 @@
 name: research
 description: Multi-source research. Queries Exa for web results, the user's local QMD knowledge base collections if installed, and the user's own past context in the nello-claw memory database, then synthesises results with citations. Use when the user asks to research a topic, find out what creators say, compare frameworks, or needs web + knowledge base + personal context in one pass. Triggers on "research X", "dig into X", "find me everything on X", "cross-reference X", "/research".
 trigger: /research
+model_hint: reasoning
 ---
 
 # /research - Multi-Source Research

@@ -1,6 +1,7 @@
 ---
 name: tool-rules
 description: Per-tool rules ("never email Sarah", "always confirm before sending invoices") pinned into the system prompt so they survive context compaction. Use when the user says "never X", "always X", "don't ever X", "from now on X", or asks to set / list / remove a rule. Auto-promotes "never <verb> <noun>" phrasings to critical priority. Reads + writes .claude/tool-rules.md in the install folder.
+model_hint: fast
 ---
 
 # Tool Rules
