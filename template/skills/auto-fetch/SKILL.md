@@ -37,7 +37,7 @@ Read the last `fetched_at` for this source from the dedup index (`@nc/core` `get
 
 Cap each source at 50 items per tick. If a source has more, stop at 50 and log "Truncated at 50 items, will catch up next tick."
 
-### 3. Classify each item
+### 3. Dedup-classify each item
 
 For each item, build a stable `source_id` and a `content` string (the body the agent will store), then:
 
@@ -47,8 +47,19 @@ const { verdict, hash, previous } = classify(source, source_id, content)
 ```
 
 - `verdict === 'unchanged'` → skip, do not write, do not count.
-- `verdict === 'new'` → write a new note (see step 4), then `markSeen({ source, source_id, content_hash: hash, vault_path })`.
-- `verdict === 'updated'` → overwrite the existing note at `previous.vault_path` with the new content, then `markSeen({ ..., vault_path })`.
+- `verdict === 'new'` → run triage (step 3b), then act on the triage verdict (step 4).
+- `verdict === 'updated'` → run triage (step 3b), then act on the triage verdict; if writing, overwrite at `previous.vault_path`.
+
+### 3b. Triage each new/updated item
+
+Invoke `/triage` on the item (cheap fast-model classifier). It returns one of `drop | ack | react | escalate`:
+
+- `drop` → call `markSeen({ source, source_id, content_hash: hash, vault_path: null })` but write nothing. Increment the "dropped" counter, move on.
+- `ack` → write the note (step 4) but skip the `Inbox.md` append (step 5). User can find it via search if they need it.
+- `react` → write the note + append the `Inbox.md` line. This is the default.
+- `escalate` → write the note + append `Inbox.md` line + send a one-line Telegram message via the bot (use the existing send-message MCP if available, or write a flagged entry to `Inbox.md` prefixed `**ESCALATE** —` so the user notices on next open).
+
+Pass the triage verdict back to the user's final summary line so they can see the distribution.
 
 ### 4. Write the note
 
@@ -77,7 +88,7 @@ Order matters: oldest item first within a tick. Don't rewrite existing lines.
 When the whole tick completes, reply with exactly one line to the chat:
 
 ```
-Auto-fetch: <N> new, <M> updated, <S> skipped across <K> sources.
+Auto-fetch: <N> new, <M> updated, <S> skipped (dropped <D>, acked <A>, reacted <R>, escalated <E>) across <K> sources.
 ```
 
 No preamble. No multi-line summary. The vault is the artefact — the chat just confirms.
