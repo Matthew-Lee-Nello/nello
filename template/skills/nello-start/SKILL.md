@@ -159,6 +159,30 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
 
 **You can write your own slash commands too.** That's what `/write-skill` is for. We'll do that together at the end of `/nello-build`.
 
+### Try one of these right now
+
+Pick one. Copy it. Paste it into the dashboard chat at `localhost:3000` or your Telegram bot. Feel the system work before you go any further.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                                                          │
+  │   1. "What do I need to know from the last 12 hours?"    │
+  │      (reads inbox + calendar, hands back a tight brief)  │
+  │                                                          │
+  │   2. "What's on my calendar today and tomorrow?"         │
+  │      (your AI now sees your Google Calendar)             │
+  │                                                          │
+  │   3. "Catch me up on my unread emails. Group by sender." │
+  │      (skim 50 emails in 10 seconds, prioritised)         │
+  │                                                          │
+  │   4. "Just chat. Tell me what you can do for me."        │
+  │      (no goal. Let the agent walk you around its tools)  │
+  │                                                          │
+  └──────────────────────────────────────────────────────────┘
+```
+
+Try one. That's the value moment. Everything from here is just adding leverage on top of it.
+
 ### Quick check before we move on
 
 Open your browser to `localhost:3000`. If the dashboard is up, you're set.
