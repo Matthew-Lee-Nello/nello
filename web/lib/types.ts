@@ -57,6 +57,8 @@ export interface Bundle {
   enableMorningBrief: boolean
   morningBriefPrompt: string
   morningBriefCron: string
+  enableAutoFetch: boolean
+  autoFetchCron: string
   voiceSource: 'online' | 'local' | 'off'
   skillPack: string[]
   optionalSkills: string[]

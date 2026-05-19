@@ -57,6 +57,12 @@ export const DEFAULT_BUNDLE: Bundle = {
   morningBriefPrompt: 'Morning brief. 3 lines max per section.\n1. What matters today (Inbox + today\'s journal)\n2. Calendar top 3\n3. Open loops to close',
   morningBriefCron: '0 9 * * *',
 
+  // Auto-fetch: every 20 minutes, walk active MCP connections (Gmail, Calendar,
+  // Drive) and fold new items into vault/Inbox.md with provenance + dedup.
+  // Same machinery as the morning brief, just on a tighter cadence.
+  enableAutoFetch: true,
+  autoFetchCron: '*/20 * * * *',
+
   // Voice: local TTS by default. voice-local package handles platform detection;
   // on non-Mac it falls back to off gracefully.
   voiceSource: 'local',
@@ -66,9 +72,9 @@ export const DEFAULT_BUNDLE: Bundle = {
   // consult this list); this array is informational for the wizard summary
   // + docs. Audit reads template/skills/ at runtime to avoid drift.
   skillPack: [
-    'diagnose', 'find-skill', 'grill-me', 'install-doctor',
+    'auto-fetch', 'cron', 'diagnose', 'find-skill', 'grill-me', 'install-doctor',
     'karpathy-guidelines', 'nello-build', 'nello-start', 'research',
-    'to-prd', 'write-skill', 'zoom-out',
+    'to-prd', 'tool-rules', 'write-skill', 'zoom-out',
   ],
   optionalSkills: [],
 

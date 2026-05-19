@@ -460,6 +460,22 @@ function seedMorningBrief(bundle) {
   else warn('morning brief registration failed')
 }
 
+function seedAutoFetch(bundle) {
+  if (bundle.enableAutoFetch === false) return  // default on if undefined
+  const cron = bundle.autoFetchCron || '*/20 * * * *'
+  const chatId = (bundle.keys?.ALLOWED_CHAT_ID ?? '').split(',')[0]?.trim()
+  if (!chatId) { warn('auto-fetch skipped (no chat id yet)'); return }
+
+  const res = spawnSync('node', [
+    join(TEMPLATE_DIR, 'packages', 'scheduler', 'dist', 'register-auto-fetch.js'),
+  ], {
+    env: { ...process.env, AUTO_FETCH_CRON: cron, ALLOWED_CHAT_ID: chatId, NC_INSTALL_PATH: INSTALL_PATH },
+    stdio: 'inherit',
+  })
+  if (res.status === 0) ok(`auto-fetch registered (${cron})`)
+  else warn('auto-fetch registration failed')
+}
+
 const BANNER = `
 ${ACCENT}
  ███╗   ██╗███████╗██╗     ██╗      ██████╗
@@ -527,6 +543,7 @@ const BUNDLE_KNOWN_KEYS = new Set([
   'vaultPath', 'vaultPreset', 'graphifyEnabled',
   'mcps', 'keys',
   'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
+  'enableAutoFetch', 'autoFetchCron',
 ])
 function validateBundle(bundle) {
   if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) {
@@ -674,6 +691,11 @@ async function main() {
   if (bundle.enableMorningBrief) {
     info('Seeding morning brief')
     seedMorningBrief(bundle)
+  }
+
+  if (bundle.enableAutoFetch !== false) {
+    info('Seeding auto-fetch (20-min tick)')
+    seedAutoFetch(bundle)
   }
 
   info('Audit')
