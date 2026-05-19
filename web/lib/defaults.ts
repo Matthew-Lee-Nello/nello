@@ -74,7 +74,7 @@ export const DEFAULT_BUNDLE: Bundle = {
   skillPack: [
     'auto-fetch', 'cron', 'diagnose', 'find-skill', 'grill-me', 'install-doctor',
     'karpathy-guidelines', 'nello-build', 'nello-start', 'research',
-    'to-prd', 'tool-rules', 'write-skill', 'zoom-out',
+    'to-prd', 'tool-rules', 'triage', 'write-skill', 'zoom-out',
   ],
   optionalSkills: [],
 
