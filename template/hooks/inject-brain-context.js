@@ -75,6 +75,7 @@ function emitFile(label, path, head = 0) {
 }
 
 emitFile('Brain Context', join(INSTALL, 'brain-context.md'))
+emitFile('Tool Rules (pinned — CRITICAL rules MUST be followed)', join(INSTALL, '.claude', 'tool-rules.md'))
 emitFile('Knowledge Graph (auto-loaded)', join(VAULT, 'graphify-out', 'GRAPH_REPORT.md'), 100)
 emitFile('Memory Index', join(VAULT, 'Memory', 'MEMORY.md'))
 emitFile(`Journal - ${today}`, join(VAULT, 'Journal', `${today}.md`))
