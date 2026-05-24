@@ -46,6 +46,10 @@ export default function HeroAscii() {
     if (dest) router.push(dest)
   }
 
+  const lastUpdated = new Date(process.env.NEXT_PUBLIC_LAST_UPDATED ?? Date.now())
+    .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    .toUpperCase()
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[var(--bg)] text-[var(--ink)]">
       {/* Dot grid backdrop — uniform ASCII-style dots, no Vitruvian man, no JS */}
@@ -163,8 +167,8 @@ export default function HeroAscii() {
           <div className="flex flex-col items-center gap-3 shrink-0">
             <ClaudeBuddy size={300} />
             <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
-              <span className="w-1 h-1 rounded-full bg-[#16a34a] animate-pulse" />
-              CLAUDE CODE · ONLINE
+              <span className="w-1 h-1 rounded-full bg-[var(--accent)]" />
+              LAST UPDATED · {lastUpdated}
             </div>
           </div>
         </div>

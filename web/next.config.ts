@@ -1,4 +1,18 @@
 import type { NextConfig } from 'next'
+import { execSync } from 'node:child_process'
+
+// Latest git commit timestamp, burned in at build time. Vercel rebuilds on every
+// push, so this naturally tracks "last updated". Falls back to build time if git
+// isn't available (running outside a repo).
+const lastCommitISO = (() => {
+  try {
+    return execSync('git log -1 --format=%cI', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return new Date().toISOString()
+  }
+})()
 
 // Conservative default CSP. The wizard collects API keys + stores them in
 // localStorage during the session, so any XSS bug on this site is high-stakes.
@@ -44,6 +58,9 @@ const SETUP_BRIDGE_HEADERS = [
 const config: NextConfig = {
   reactStrictMode: true,
   experimental: { typedRoutes: true },
+  env: {
+    NEXT_PUBLIC_LAST_UPDATED: lastCommitISO,
+  },
   async headers() {
     return [
       { source: '/:path*', headers: SECURITY_HEADERS },
