@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const STORAGE_KEY = 'nello-guide-toast-dismissed'
-const GUIDE_URL = 'https://www.youtube.com/watch?v=TBD' // TODO: Matt to paste real URL
+const GUIDE_URL = 'https://www.youtube.com/watch?v=MXLgvww5sl4&t=4s' // paste real URL
 const SHOW_DELAY_MS = 2500
 
 export function GuideToast() {

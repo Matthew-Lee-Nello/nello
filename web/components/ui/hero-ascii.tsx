@@ -65,7 +65,7 @@ export default function HeroAscii() {
       <div className="absolute bottom-5 left-16 lg:bottom-6 lg:left-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75">
         meticulously crafted by{' '}
         <a
-          href="https://instagram.com/mattlee.nello"
+          href="https://instagram.com/leematthew.ai"
           target="_blank"
           rel="noopener noreferrer"
           className="text-[var(--ink)] hover:text-[var(--accent)] underline underline-offset-2 decoration-[var(--ink)]/30 hover:decoration-[var(--accent)] transition-colors"
