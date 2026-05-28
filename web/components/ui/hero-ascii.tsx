@@ -78,6 +78,7 @@ export default function HeroAscii() {
       {/* Copyright — bottom-right */}
       <div className="absolute bottom-5 right-16 lg:bottom-6 lg:right-20 z-20 text-[10px] lg:text-[11px] font-mono tracking-wider text-[var(--muted)] opacity-75 select-none">
         © NELLO LABS 2026
+        <span aria-hidden="true" className="ml-1.5 text-[12px] lg:text-[13px] align-[-0.05em]">†</span>
       </div>
 
       {/* Hero — content + mark, centred together as one group */}
