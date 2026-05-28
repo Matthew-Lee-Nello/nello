@@ -29,7 +29,7 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
   "connect-src 'self' https://booking.nello.gg",
-  "frame-src 'self' https://booking.nello.gg",
+  "frame-src 'self' https://booking.nello.gg https://www.youtube-nocookie.com",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",

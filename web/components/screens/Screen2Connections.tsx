@@ -27,7 +27,7 @@ export default function Screen2Connections() {
 
   return (
     <div className="screen">
-      <h2>2. Connect your accounts</h2>
+      <h2>3. Connect your accounts</h2>
       <p className="intro">
         Five keys, three services. Your assistant texts you (Telegram), runs Gmail / Drive / Calendar (Google), and searches the live web (Exa). Keys stay on your computer - we never see them.
       </p>

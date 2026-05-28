@@ -66,6 +66,6 @@ export interface Bundle {
   platform: Platform
 }
 
-export type Screen = 1 | 2 | 3
+export type Screen = 0 | 1 | 2 | 3
 
 export type Platform = 'mac' | 'windows' | 'linux'

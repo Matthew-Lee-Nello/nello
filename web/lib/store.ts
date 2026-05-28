@@ -16,13 +16,13 @@ interface WizardState {
 export const useWizard = create<WizardState>()(
   persist(
     (set) => ({
-      screen: 1,
+      screen: 0,
       bundle: DEFAULT_BUNDLE,
       setScreen: (s) => set({ screen: s }),
       update: (patch) => set((st) => ({ bundle: { ...st.bundle, ...patch } })),
-      reset: () => set({ screen: 1, bundle: DEFAULT_BUNDLE }),
+      reset: () => set({ screen: 0, bundle: DEFAULT_BUNDLE }),
     }),
-    // v3 - 3-screen wizard (About / Connections / Build). Old schemas discard on load.
-    { name: 'nello-claw-wizard-v3' }
+    // v4 - 4-screen wizard (Watch / About / Connections / Build). Bumped so v3 visitors land on the intro, not stale state.
+    { name: 'nello-claw-wizard-v4' }
   )
 )
