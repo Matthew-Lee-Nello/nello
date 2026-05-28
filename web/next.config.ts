@@ -24,11 +24,11 @@ const isDev = process.env.NODE_ENV !== 'production'
 
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://booking.nello.gg`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://booking.nello.gg https://connect.facebook.net`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://booking.nello.gg",
+  "connect-src 'self' https://booking.nello.gg https://www.facebook.com",
   "frame-src 'self' https://booking.nello.gg https://www.youtube-nocookie.com",
   "frame-ancestors 'none'",
   "form-action 'self'",

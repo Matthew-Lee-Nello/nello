@@ -1,12 +1,18 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useWizard } from '@/lib/store'
+import { fireMetaLead } from '@/lib/meta-lead'
 
 const VIDEO_ID = 'MXLgvww5sl4'
 const EMBED_URL = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?rel=0&modestbranding=1&playsinline=1`
 
 export default function Screen0Intro() {
   const { setScreen } = useWizard()
+
+  useEffect(() => {
+    fireMetaLead()
+  }, [])
 
   return (
     <div className="screen">

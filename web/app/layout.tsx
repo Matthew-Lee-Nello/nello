@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Figtree, Instrument_Serif } from 'next/font/google'
 import './globals.css'
+import { MetaPixel } from '@/components/MetaPixel'
 
 const figtree = Figtree({
   subsets: ['latin'],
@@ -30,7 +31,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${figtree.variable} ${instrumentSerif.variable}`}>
-      <body>{children}</body>
+      <body>
+        <MetaPixel />
+        {children}
+      </body>
     </html>
   )
 }
