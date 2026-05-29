@@ -20,6 +20,21 @@ export default function Screen0Intro() {
       <p className="intro">
         Step-by-step walkthrough. Everything you need to get your AI assistant live in under 10 minutes.
       </p>
+      <p
+        className="intro"
+        style={{ marginTop: '0.5rem', fontSize: '0.9em', opacity: 0.8 }}
+      >
+        You'll need Claude Code installed first. Grab it at{' '}
+        <a
+          href="https://claude.com/claude-code"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--ink)', textDecoration: 'underline' }}
+        >
+          claude.com/claude-code
+        </a>
+        .
+      </p>
 
       <div
         style={{
