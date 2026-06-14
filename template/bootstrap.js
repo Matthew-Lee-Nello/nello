@@ -191,15 +191,26 @@ function writeEnv(bundle) {
   try { chmodSync(envPath, 0o600) } catch {}
 }
 
-// Merge freshly-rendered MCP servers over whatever is already on disk so that
-// servers a client added post-install (via /mcp-implement for their own tool
-// stack) survive a bootstrap re-run. Managed baseline servers (google / obsidian
-// / exa / …) are refreshed from the render; any unmanaged server already present
-// is preserved. Mirrors mergeSettingsJson's existing-then-new overlay.
-function writeMergedMcpConfig(path, rendered) {
+// Every server name a given renderer can emit (all baseline flags on). Derived
+// from the renderer itself, not hardcoded, so the managed set can never drift
+// from render-configs.js. .mcp.json and claude_desktop_config.json have
+// different baseline sets, so each call passes its own renderer's set.
+function managedMcpKeys(renderFn) {
+  const allOn = { mcps: { google: true, obsidian: true, exa: true, apify: true, tavily: true, firecrawl: true }, env: {}, vaultPath: '' }
+  return new Set(Object.keys(renderFn(allOn).mcpServers || {}))
+}
+
+// Write the rendered MCP config, preserving servers a client added post-install
+// (via /mcp-implement for their own tool stack) while letting the render stay
+// authoritative over the baseline. Managed baseline servers are dropped from the
+// on-disk set first, then the fresh render is overlaid — so a re-run with a
+// baseline MCP deselected actually removes it, and a renamed baseline command is
+// replaced, instead of a stale entry lingering. Unmanaged (client-added) servers
+// pass through untouched.
+function writeMergedMcpConfig(path, rendered, managed) {
   // Refuse to write through a symlink (same guard as mergeSettingsJson). Without
   // it the writeFileSync below follows a planted symlink and overwrites an
-  // arbitrary user-writable file outside the install folder — breaking the
+  // arbitrary user-writable file outside the install folder, breaking the
   // SECURITY.md boundary.
   if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
     fail(`Refusing to write through symlink: ${path}`)
@@ -209,7 +220,10 @@ function writeMergedMcpConfig(path, rendered) {
   if (existsSync(path)) {
     try { existingServers = JSON.parse(readFileSync(path, 'utf-8')).mcpServers || {} } catch {}
   }
-  const merged = { mcpServers: { ...existingServers, ...(rendered.mcpServers || {}) } }
+  const preserved = Object.fromEntries(
+    Object.entries(existingServers).filter(([k]) => !managed.has(k))
+  )
+  const merged = { mcpServers: { ...preserved, ...(rendered.mcpServers || {}) } }
   writeFileSync(path, JSON.stringify(merged, null, 2))
 }
 
@@ -679,7 +693,7 @@ const BUNDLE_KNOWN_KEYS = new Set([
   'vaultPath', 'vaultPreset', 'customPrefixes', 'graphifyEnabled',
   'mcps', 'keys',
   'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
-  'enableAutoFetch', 'autoFetchCron', 'voiceSource',
+  'enableAutoFetch', 'autoFetchCron',
   'telegramChatId',
 ])
 function validateBundle(bundle) {
@@ -771,8 +785,8 @@ async function main() {
   // Handlebars HTML-escapes but does NOT JSON-string-escape, so any `"` or `\`
   // or newline in installPath / vaultPath / env values used to break these
   // configs or inject extra args/env structure into spawned MCP processes.
-  writeMergedMcpConfig(join(INSTALL_PATH, '.mcp.json'), renderMcpJson(ctx))
-  writeMergedMcpConfig(join(INSTALL_PATH, 'claude_desktop_config.json'), renderClaudeDesktopConfig(ctx))
+  writeMergedMcpConfig(join(INSTALL_PATH, '.mcp.json'), renderMcpJson(ctx), managedMcpKeys(renderMcpJson))
+  writeMergedMcpConfig(join(INSTALL_PATH, 'claude_desktop_config.json'), renderClaudeDesktopConfig(ctx), managedMcpKeys(renderClaudeDesktopConfig))
   writeEnv(bundle)
   ok('CLAUDE.md, AGENTS.md, brain-context.md, .env, .mcp.json, claude_desktop_config.json')
 
@@ -879,7 +893,7 @@ async function main() {
     if (process.platform === 'darwin') {
       console.log(`  ${DIM}launchctl kickstart -k gui/$(id -u)/${LAUNCHAGENT_LABEL}${RESET}`)
     } else if (process.platform === 'win32') {
-      console.log(`  ${DIM}schtasks /End /TN "${LAUNCHAGENT_LABEL}" && schtasks /Run /TN "${LAUNCHAGENT_LABEL}"${RESET}`)
+      console.log(`  ${DIM}Log out and back in (the Startup item relaunches the daemon), or kill the node daemon and re-run nello-claw-daemon.cmd${RESET}`)
     } else {
       console.log(`  ${DIM}systemctl --user restart ${LAUNCHAGENT_LABEL}${RESET}`)
     }
