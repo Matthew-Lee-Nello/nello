@@ -36,7 +36,7 @@ The blocks marked `<!-- BEGIN USER-PROVIDED ... -->` come straight from the wiza
 
 {{#if clients.length}}**Clients:** {{#each clients}}{{name}} [{{status}}]{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 
-{{#if mentors.length}}**Network:** {{#each mentors}}{{name}} ({{relationship}}){{#unless @last}}, {{/unless}}{{/each}}{{/if}}
+{{#if mentors.length}}**Network:** {{#each mentors}}{{name}}{{#if relationship}} ({{relationship}}){{/if}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 <!-- END USER-PROVIDED people -->
 
 ## Tools in Play

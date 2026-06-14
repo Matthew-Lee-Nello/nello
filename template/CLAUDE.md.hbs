@@ -49,6 +49,18 @@ Rules you never break:
 This is {{name}}'s self-description from setup. Treat it as the source of truth for tone, priorities, and what matters to them. As you talk to {{name}}, your auto-memory hook captures more detail into `vault/Memory/` - this section stays fixed.
 {{/if}}
 
+{{#if company}}
+## The Business
+
+- **Company:** {{company}}{{#if role}} — {{name}} is {{role}}{{/if}}
+{{#if industry}}- **Industry:** {{industry}}{{/if}}
+{{#if targetCustomer}}- **Who they serve:** {{targetCustomer}}{{/if}}
+{{#if services.length}}- **Offers / services:** {{#each services}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
+{{#if tools.length}}- **Tool stack:** {{#each tools}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
+
+Standing business context, captured at setup. When {{name}} asks about clients, outreach, offers, pricing, or strategy, you already know the shape of the business - don't re-ask the basics. As you learn more, the auto-memory hook adds detail to `vault/Memory/`.
+{{/if}}
+
 {{#if projects.length}}
 ## Active Projects
 

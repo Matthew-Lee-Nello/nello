@@ -114,29 +114,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .hero p { color: var(--muted); font-size: 17px; line-height: 1.7; }
 .hero .cta { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; }
 
+/* Single-screen install page (the multi-screen nav was retired with the
+   conversational install). One centred column, no sidebar. */
 .wizard {
-  max-width: 1100px;
+  max-width: 720px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 40px;
   padding: 40px 24px;
 }
-.wizard-nav { position: sticky; top: 40px; align-self: start; }
-.wizard-nav ol { list-style: none; padding: 0; margin: 0; }
-.wizard-nav li {
-  padding: 10px 12px;
-  border-radius: 6px;
-  margin-bottom: 4px;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
-  font-size: 13px;
-  transition: background 0.15s, color 0.15s;
-}
-.wizard-nav li.active { background: var(--accent-dim); color: var(--accent); }
-.wizard-nav li.done { color: var(--accent); opacity: 0.6; }
-.wizard-nav li:hover { background: var(--panel); color: var(--text); }
 
 .screen {
   background: var(--panel);
@@ -163,38 +147,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ─── Wizard mobile breakpoint ─── */
 @media (max-width: 768px) {
   .wizard {
-    grid-template-columns: 1fr;
-    gap: 16px;
     padding: 20px 14px;
-  }
-  .wizard-nav {
-    position: relative;
-    top: 0;
-  }
-  .wizard-nav ol {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-  }
-  .wizard-nav li {
-    flex: 1 0 auto;
-    white-space: nowrap;
-    text-align: center;
-    font-size: 12px;
-    padding: 10px 14px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    margin-bottom: 0;
-  }
-  .wizard-nav li.active {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-  .wizard-nav li.done {
-    border-color: var(--accent);
-    opacity: 0.5;
   }
   .screen {
     padding: 22px 18px;

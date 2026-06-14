@@ -101,7 +101,25 @@ function buildContext(bundle) {
   const mcpsList = Object.entries(bundle.mcps || {})
     .filter(([, on]) => !!on)
     .map(([name]) => ({ name, purpose: MCP_PURPOSES[name] || '' }))
+  // Persona defaults. CLAUDE.md.hbs reads these directly; a conversational
+  // install may legitimately leave some unset. Defaulting here (rather than in
+  // the bundle) keeps the rendered persona correct — e.g. without
+  // installTelegram/installDashboard the "accessible via …" line drops both
+  // surfaces it actually has.
+  const PERSONA_DEFAULTS = {
+    communicationStyle: 'direct',
+    language: 'AU',
+    emDashPolicy: 'never',
+    oxfordComma: false,
+    bannedWords: [],
+    values: [],
+    enableKarpathyGuidelines: true,
+    enableHumanizer: true,
+    installTelegram: true,
+    installDashboard: true,
+  }
   return {
+    ...PERSONA_DEFAULTS,
     ...bundle,
     installPath: installPathPosix,
     escapedPath,
@@ -126,6 +144,17 @@ function writeEnv(bundle) {
   // pairing, gated on an empty allowlist) never fires.
   const ownerChatId = String(bundle.telegramChatId ?? keys.ALLOWED_CHAT_ID ?? '').trim()
   if (ownerChatId) keys.ALLOWED_CHAT_ID = ownerChatId
+
+  // Fail closed on an unlocked bot. If a Telegram token ships but no owner chat
+  // ID, discovery.ts does first-message-wins pairing and hands ownership of a
+  // bypassPermissions assistant to whoever messages the bot first. install.sh
+  // asserts this after the fact, but the conversational install runs bootstrap
+  // directly (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard the
+  // invariant here, where every entry path passes through.
+  if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
+    fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
+    process.exit(1)
+  }
 
   // Dashboard auth token (v1 security blocker). The dashboard + its chat route
   // run with bypassPermissions, so an unauthed device reaching it is RCE. The
@@ -160,6 +189,28 @@ function writeEnv(bundle) {
   const envPath = join(INSTALL_PATH, '.env')
   writeFileSync(envPath, lines.join('\n'))
   try { chmodSync(envPath, 0o600) } catch {}
+}
+
+// Merge freshly-rendered MCP servers over whatever is already on disk so that
+// servers a client added post-install (via /mcp-implement for their own tool
+// stack) survive a bootstrap re-run. Managed baseline servers (google / obsidian
+// / exa / …) are refreshed from the render; any unmanaged server already present
+// is preserved. Mirrors mergeSettingsJson's existing-then-new overlay.
+function writeMergedMcpConfig(path, rendered) {
+  // Refuse to write through a symlink (same guard as mergeSettingsJson). Without
+  // it the writeFileSync below follows a planted symlink and overwrites an
+  // arbitrary user-writable file outside the install folder — breaking the
+  // SECURITY.md boundary.
+  if (existsSync(path) && lstatSync(path).isSymbolicLink()) {
+    fail(`Refusing to write through symlink: ${path}`)
+    process.exit(1)
+  }
+  let existingServers = {}
+  if (existsSync(path)) {
+    try { existingServers = JSON.parse(readFileSync(path, 'utf-8')).mcpServers || {} } catch {}
+  }
+  const merged = { mcpServers: { ...existingServers, ...(rendered.mcpServers || {}) } }
+  writeFileSync(path, JSON.stringify(merged, null, 2))
 }
 
 function symlinkSkills() {
@@ -615,12 +666,20 @@ function detectStaleInstalls() {
 // types so a hostile bundle can't smuggle extra data into context that later
 // drives file writes or process spawning.
 const BUNDLE_KNOWN_KEYS = new Set([
-  'name', 'assistantName', 'occupation', 'location', 'timezone', 'bio',
+  'name', 'assistantName', 'occupation', 'location', 'timezone', 'bio', 'age',
   'projects', 'teamMembers', 'clients', 'mentors', 'tools',
-  'vaultPath', 'vaultPreset', 'graphifyEnabled',
+  // Deep company brain — the conversational install (INSTALL_GUIDE.md) interviews
+  // the client about their business and writes these so CLAUDE.md ships with real
+  // context instead of empty defaults.
+  'role', 'company', 'industry', 'targetCustomer', 'services', 'values',
+  // Voice/persona — consumed by CLAUDE.md.hbs. Without these on the whitelist a
+  // bundle that sets them is hard-rejected, so the persona could never be tuned.
+  'communicationStyle', 'language', 'emDashPolicy', 'oxfordComma', 'bannedWords',
+  'enableKarpathyGuidelines', 'enableHumanizer', 'installTelegram', 'installDashboard',
+  'vaultPath', 'vaultPreset', 'customPrefixes', 'graphifyEnabled',
   'mcps', 'keys',
   'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
-  'enableAutoFetch', 'autoFetchCron',
+  'enableAutoFetch', 'autoFetchCron', 'voiceSource',
   'telegramChatId',
 ])
 function validateBundle(bundle) {
@@ -712,8 +771,8 @@ async function main() {
   // Handlebars HTML-escapes but does NOT JSON-string-escape, so any `"` or `\`
   // or newline in installPath / vaultPath / env values used to break these
   // configs or inject extra args/env structure into spawned MCP processes.
-  writeFileSync(join(INSTALL_PATH, '.mcp.json'), JSON.stringify(renderMcpJson(ctx), null, 2))
-  writeFileSync(join(INSTALL_PATH, 'claude_desktop_config.json'), JSON.stringify(renderClaudeDesktopConfig(ctx), null, 2))
+  writeMergedMcpConfig(join(INSTALL_PATH, '.mcp.json'), renderMcpJson(ctx))
+  writeMergedMcpConfig(join(INSTALL_PATH, 'claude_desktop_config.json'), renderClaudeDesktopConfig(ctx))
   writeEnv(bundle)
   ok('CLAUDE.md, AGENTS.md, brain-context.md, .env, .mcp.json, claude_desktop_config.json')
 

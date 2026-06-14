@@ -1,116 +1,190 @@
-# nello-claw - Install Reference
+# nello-claw — Install Interview (read this top to bottom, then run it)
 
-Reference documentation for what the install actually does. Not a command file.
+**You are Claude Code. This document is your script.** The person who pasted the install prompt is your new owner. You are going to interview them, collect their details and credentials, build their company brain, wire their tools, and stand up their AI assistant end to end. Work through the steps in order. Do not skip ahead.
 
-If you got here from the wizard at labs.nello.gg, the prompt you pasted into Claude Code already contains the actual install steps. This document is here so you (and your assistant) can verify what is about to happen before approving it in Plan Mode.
+Read `SECURITY.md` in this repo before you start so you can answer "what is this about to do to my machine" honestly.
 
-> **Use Claude Code's Plan Mode** (Shift+Tab twice) when you paste the install prompt. Your assistant writes out the steps it intends to take. You read them. You approve, or you don't.
+## How to run this interview
 
-## Where it installs
+- **Plan Mode for the build step only.** The interview itself is a normal conversation — ask, listen, confirm. When you reach the bootstrap step (Step 6), summarise every change first and get a yes before running anything.
+- **One thing at a time.** Ask one question (or one tight group), wait for the answer, validate it, reflect it back, move on. Do not dump the whole questionnaire at once.
+- **Grill them — kindly.** This is the only time you get their full attention to build the brain. If an answer is thin ("I do marketing"), dig: for who, what outcome, what's the offer. Better input now = a sharper assistant forever. Match the tone of the `grill-me` skill, not an interrogation.
+- **Plain language.** Your owner may not be technical. No jargon in your questions. "What does your business sell?" not "describe your value proposition." Translate every technical step into something a non-developer can follow.
+- **Never proceed on a blank required field.** If something required is missing or fails validation, stop and ask again. Do not invent a value to get past a check.
+- **Ask before anything destructive.** Cloning, installing packages, writing files in the current folder — say what you're about to do, then do it. Nothing outside this folder, `~/.claude/skills/` symlinks, and the login-item without calling it out.
 
-Whatever folder you are currently in when you run the install command. So before you start: open VS Code, open the folder you want your assistant to live in (any name, any location - Desktop, Documents, etc), then run the install in that folder's Terminal.
+---
 
-If you start the install in a folder that already has unrelated files, the installer refuses and tells you to pick a fresh empty folder.
+## Step 1 — Pre-flight
 
-## What gets installed
+1. **Confirm the folder.** Run `pwd` and `ls -A`. The current folder must be empty (or contain only this cloned repo / a `bundle.json`). If it has unrelated files, stop and tell them to open an empty folder in VS Code and restart.
+2. **Detect the OS** (`uname` / platform) so you adapt every command (Mac/Linux/Windows).
+3. **Check prerequisites** and install what's missing (ask first on Mac/Linux package installs):
+   - `git`, `node` (v20+), `pnpm` — required.
+   - `claude` (Claude Code CLI) — **required, fatal if missing.** The daemon drives Claude through it. If absent, send them to https://claude.com/claude-code and stop.
+   - `graphify` — optional, non-fatal.
+4. **Clone if needed.** If this repo isn't already in the folder: `git clone https://github.com/Matthew-Lee-Nello/nello-claw.git .`
+5. **Build the code** (do this now so the later bootstrap is fast): `pnpm install` then `pnpm -r --filter '!@nc/web' build && pnpm --filter nello-claw-template build`.
 
-Running the install fills your chosen folder with:
+Tell them what you found ("Claude Code ✓, Node ✓, installed pnpm for you") and move on.
 
-- `CLAUDE.md` - your assistant's persona, generated from your wizard answers
-- `.env` - your API keys (Telegram, Google, optional ones), permissions set so only you can read it
-- `vault/` - your Obsidian vault, structured per the system you picked (NELLO/PARA/Zettelkasten/Custom)
-  - `vault/Memory/` - your assistant auto-captures preferences/feedback/decisions here as Obsidian notes (the vault IS the permanent memory)
-  - `vault/Journal/` - empty by default; write your own daily notes here, or ask the assistant to summarise into `YYYY-MM-DD.md`. SessionStart hook reads today + yesterday's journal back into context if files are present.
-  - `vault/.obsidian/` - pre-configured dark theme + FFA600 accent + graph view tuned for your scale
-- `store/clawd.db` - SQLite database for short-term conversation context, scheduled tasks, sessions
-- `node_modules/`, `dist/` - dependencies and compiled code
-- `.claude/settings.json` - **project-scoped** Claude Code settings (see "Security" below)
-- All bundled abilities (skills) get symlinked into `~/.claude/skills/` so Claude Code can discover them when working in `<install-folder>/`. See `template/skills/` in the repo for the current list.
+---
 
-It also auto-installs (if missing):
-- **Obsidian.app** (Mac via Homebrew cask, Windows via winget) - so your vault opens in a real app, not just on disk
-- **obsidian-cli** (npm global) - lets your assistant write/search the vault from the command line
+## Step 2 — Identity
 
-If you opted in:
-- A LaunchAgent (Mac) or per-user Startup-folder `.lnk` (Windows, no admin/UAC required) or systemd user service (Linux) so the daemon starts on login
-- A `nello-claw.app` (Mac) or Start Menu + Desktop shortcut (Windows) that opens the dashboard at `localhost:3000` in app-mode
+Collect, one at a time:
 
-When the install finishes the dashboard opens in app-mode AND your vault opens in Obsidian alongside it.
+- **Their name** → `name`
+- **What to call the assistant** (you) → `assistantName`
+- **What they do** in one line → `occupation`
+- **About them, in their words** — a few sentences on who they are, what they care about, how they like to be spoken to. This becomes the assistant's source-of-truth for tone. Push for at least 2-3 real sentences → `bio`
 
-## What the bootstrap script does
+---
 
-[`template/bootstrap.js`](template/bootstrap.js) is the script that does the work. It:
+## Step 3 — The company brain (grill here)
 
-1. Reads your `~/Downloads/nello-claw-bundle.json` (your wizard answers + API keys)
-2. Renders Handlebars templates with your values to write `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.env`
-3. Sets `chmod 600` on `.env` so other users on your machine cannot read it
-4. Seeds your notes folder from the preset you picked
-5. Symlinks the bundled abilities (skills) into `~/.claude/skills/`. The skill set in `template/skills/` is the source of truth - count varies as we add or retire skills. If a skill with the same name already exists there, the existing one is renamed to `.bak-<timestamp>` first
-6. Writes a project-scoped `.claude/settings.json` inside `<install-folder>/` with hooks + `bypassPermissions: true` for THAT project only
-7. Creates `store/`, `workspace/uploads/`, `vault/Memory/`, `vault/Journal/` directories
-8. Installs Obsidian.app (Homebrew cask on Mac, winget on Windows) and `obsidian-cli` globally via npm so your assistant can drive Obsidian from the command line. Skipped if Obsidian is already installed.
-9. If you opted into auto-start: registers the service via `launchctl` (Mac) / per-user Startup-folder `.lnk` (Windows) / `systemctl --user` (Linux)
-10. If you opted into morning brief: seeds a scheduled task in the SQLite DB
-11. Runs `nello-claw audit` to verify everything
+This is what makes their assistant useful on day one instead of a blank chatbot. Interview them properly:
 
-You can read the full script at the path above before running.
+- **Their role + company** → `role`, `company`
+- **Industry** → `industry`
+- **Who they serve** (their ideal customer / client profile) → `targetCustomer`
+- **What they sell** (offers / services, as a list) → `services` (string array)
+- **Active projects** — name + one line each → `projects` ([{name, description}])
+- **Their people** — team members (name + role) → `teamMembers` ([{name, role}]); key clients (name + status, e.g. "active", "prospect") → `clients` ([{name, status}]); mentors/advisors → `mentors` ([{name, relationship}])
+- **Voice rules** — how should the assistant write? Default to: direct, Australian English, no em dashes, no AI clichés. Ask if they want anything banned or any house style → `communicationStyle`, `language` ('AU'/'US'/'UK'), `emDashPolicy` ('never'/'sparingly'/'free'), `oxfordComma` (bool), `bannedWords` (string array)
 
-## Security
+Capture honestly. Empty arrays are fine where they genuinely have nothing yet — don't fabricate clients or team.
 
-Three things to know:
+---
 
-**1. `bypassPermissions` is project-scoped, not global.**
+## Step 4 — Core credentials
 
-The setting goes in `<install-folder>/.claude/settings.json`, not `~/.claude/settings.json`. It only applies when Claude Code is working inside the `<install-folder>/` folder (which is where your assistant lives). Your other projects keep their normal Claude Code permission prompts.
+Three services everyone gets: **Telegram** (the assistant texts them), **Google** (Gmail / Drive / Calendar), **Exa** (live web search). Walk each one, paste, validate, confirm. Keys never leave their machine — say so.
 
-You can verify after install:
+### 4a. Telegram
+1. **Bot token:** open Telegram, message **@BotFather**, send `/newbot`, follow the prompts, copy the token it gives back.
+   - Validate against `^\d+:[A-Za-z0-9_-]{30,}$`. If it fails, they pasted something else — ask again.
+   - → `keys.TELEGRAM_BOT_TOKEN`
+2. **Their chat ID:** in Telegram, search **@userinfobot**, send it any message, copy the number it replies with.
+   - Validate against `^-?\d{5,}$`.
+   - → `telegramChatId` **and** `keys.ALLOWED_CHAT_ID` (set both to the same value — this is the owner lock). The bootstrap hard-fails if a bot token is present but this is empty, so the bot never ships open to the world. Don't work around that failure by inventing a value — go get the real chat ID.
+
+### 4b. Google (their own OAuth app — ~10 min, one time)
+They create their own Google Cloud app so their data stays theirs. Walk it slowly:
+
+1. Go to **console.cloud.google.com**. Create a new project (top bar → project dropdown → New project), name it anything (e.g. "my-assistant"), select it.
+2. **Enable the APIs** they'll use. Search each in the top bar and click Enable: **Gmail API**, **Google Calendar API**, **Google Drive API**, **Google Docs API**, **Google Sheets API**.
+3. **OAuth consent screen** (left menu → APIs & Services → OAuth consent screen): choose **External**, give it an app name, put their own email as support + developer contact, save.
+4. **Add themselves as a test user:** on the consent screen / Audience tab → **Test users** → add their Google email. (Skipping this is the #1 reason Google auth fails later — an unverified app only works for listed test users.)
+5. **Create the credential:** APIs & Services → Credentials → **Create credentials → OAuth client ID → Application type: Desktop app** → Create. Copy the **Client ID** and **Client secret**.
+6. Collect and validate:
+   - `keys.GOOGLE_USER_EMAIL` — their Google address (email format).
+   - `keys.GOOGLE_OAUTH_CLIENT_ID` — length > 30 or ends `apps.googleusercontent.com`.
+   - `keys.GOOGLE_OAUTH_CLIENT_SECRET` — length > 20.
+
+If Google auth errors after install, the usual fixes are: they weren't added as a test user (Step 4), or the OAuth client type didn't match what `workspace-mcp` expects — check the `workspace-mcp` README for the current redirect/client-type and recreate the credential.
+
+### 4c. Exa
+1. Go to **dashboard.exa.ai**, sign up (free tier is fine), copy an API key.
+2. Validate length > 20. → `keys.EXA_API_KEY`
+
+---
+
+## Step 5 — Assemble `bundle.json`
+
+Write `./bundle.json` in this folder from everything collected. **Use only these keys** — the bootstrap rejects any unknown key and refuses to run:
+
+```jsonc
+{
+  "name": "", "assistantName": "", "occupation": "", "bio": "",
+  "role": "", "company": "", "industry": "", "targetCustomer": "",
+  "services": [], "tools": [],
+  "projects": [{ "name": "", "description": "" }],
+  "teamMembers": [{ "name": "", "role": "" }],
+  "clients": [{ "name": "", "status": "" }],
+  "mentors": [{ "name": "", "role": "" }],
+  "communicationStyle": "direct", "language": "AU",
+  "emDashPolicy": "never", "oxfordComma": false, "bannedWords": [],
+  "vaultPreset": "nello", "graphifyEnabled": true,
+  "mcps": { "google": true, "obsidian": true, "exa": true },
+  "keys": {
+    "TELEGRAM_BOT_TOKEN": "", "ALLOWED_CHAT_ID": "",
+    "GOOGLE_USER_EMAIL": "", "GOOGLE_OAUTH_CLIENT_ID": "", "GOOGLE_OAUTH_CLIENT_SECRET": "",
+    "EXA_API_KEY": ""
+  },
+  "telegramChatId": "",
+  "installTelegram": true, "installDashboard": true, "installLaunchAgent": true,
+  "enableMorningBrief": true,
+  "morningBriefPrompt": "Morning brief. 3 lines max per section.\n1. What matters today\n2. Calendar top 3\n3. Open loops to close",
+  "morningBriefCron": "0 9 * * *",
+  "enableAutoFetch": true, "autoFetchCron": "*/20 * * * *",
+  "voiceSource": "local"
+}
 ```
-cat <install-folder>/.claude/settings.json
-cat ~/.claude/settings.json   # should be unchanged
-```
 
-**2. Your API keys live on your computer in plaintext, in `<install-folder>/.env`.**
+`tools` is the plain list of what their business runs on (you'll fill it in Step 7). The baseline `mcps` trio (google / obsidian / exa) ships for everyone — leave those on.
 
-This is the same trade-off every local AI tool makes (Ollama, LM Studio, etc). The file has `chmod 600` so only your user account can read it. Nobody at NELLO Labs sees your keys - the wizard at labs.nello.gg never receives them, the install bundle is downloaded directly to your machine.
+---
 
-After install: delete `~/Downloads/nello-claw-bundle.json` yourself. The installer leaves it in place so you can verify it. The keys in there are duplicates of what got written to `<install-folder>/.env`.
+## Step 6 — Build (Plan Mode)
 
-**3. The skill symlinks point at files inside `<install-folder>/template/skills/`.**
+1. **Summarise** for approval: "I'm about to run the installer. It will write `CLAUDE.md`, `.env` (chmod 600), seed your Obsidian vault, symlink skills into `~/.claude/skills/`, install Obsidian + a login item so your assistant starts on boot, and start the dashboard at localhost:3000. Nothing leaves your machine. OK to run?"
+2. On yes: `NC_INSTALL_PATH=$(pwd) node ./template/bootstrap.js` (it reads `./bundle.json`). The bootstrap prints its own change log.
+3. **Verify the owner lock took** before you let the daemon keep running: run `grep -q '^ALLOWED_CHAT_ID=.\+' .env`. If it fails, **stop** — do not leave the daemon up — re-collect the chat ID (Step 4a) and re-run the bootstrap. (The bootstrap itself also hard-fails on an empty lock when a bot token is set; this is the belt-and-braces check.) Then confirm the dashboard answers on `localhost:3000`.
 
-Those are open-source SKILL.md files in the public repo at github.com/Matthew-Lee-Nello/nello-claw. Read them before approving the install if you want to know what abilities your assistant gets:
-For the current set, browse [template/skills/](template/skills/) in the repo. Each subfolder is a skill with a SKILL.md file describing its purpose. Examples that ship today: clean-code reasoning, find-skill (discover + vet + install new abilities), parallel web research, session checkpoint, structured problem breakdown, vault hygiene checker, self-reflection loop.
+---
 
-## What it does NOT do
+## Step 7 — Their tool stack (the part that makes every client different)
 
-- It does not modify `~/.claude/settings.json` (your global Claude Code settings)
-- It does not upload anything to NELLO Labs servers
-- It does not phone home, send telemetry, or report usage
-- It does not modify any file outside `<install-folder>/`, `~/.claude/skills/<symlinks>`, `~/Library/LaunchAgents/com.nello-claw.server.plist` (Mac), or the equivalents on Windows/Linux
+Two clients are never the same. Now wire what *this* one runs on.
+
+1. Ask: **"Beyond Google, what does your business actually run on day to day?"** Slack, Notion, HubSpot, Salesforce, Linear, GitHub, Stripe, Xero, Apify — whatever they name. Record the list into `tools` (re-run the relevant render or note it for CLAUDE.md context).
+2. For **each** tool they named, wire it the proper way using the bundled **`mcp-implement`** skill (read `~/.claude/skills/mcp-implement/SKILL.md`): vet the server (via `find-skill`'s checklist) → classify stateless/stateful → install pinned (never `npx -y` in the saved config) → add it to **this install's** `.mcp.json` + `claude_desktop_config.json` → collect that tool's credentials the same paste-and-validate way → **verify with one real read-only tool call** → restart the daemon.
+3. Anything with no known MCP → fall back to `find-skill` discovery, vet, install.
+4. Don't over-collect. Wire what they'll use this week; tell them they can add more anytime by saying *"find me a connection for X."*
+
+---
+
+## Step 8 — Seed the brain into the vault
+
+The persona in `CLAUDE.md` now carries their business. Make the vault match so search + the graph have something to stand on. From the Step 3 answers, write starter notes in the vault taxonomy (`nello` preset → `Person-`, `Client-`, `Project-` prefixes with `type`/`tags`/`date` frontmatter): one note per client, per team member, per active project. Keep them short — name, role/status, one or two facts. The auto-memory hook grows them over time.
+
+---
+
+## Step 9 — Verify + hand off
+
+1. Run **`/install-doctor`** — work the report top to bottom, fix anything red (most common: Claude Code auth, or a missing key).
+2. Tell them to **send their Telegram bot a message** to finish the phone link.
+3. Hand off: **"Run `/nello-start`"** — it tours what's now running and chains into `/nello-build` to wire their first features.
+
+---
+
+## Reference — what the bootstrap writes
+
+`template/bootstrap.js` reads `./bundle.json` and:
+- Renders `CLAUDE.md` (persona + their brain), `.env` (chmod 600), `.mcp.json`, `claude_desktop_config.json`.
+- Seeds `vault/` from the chosen preset + creates `vault/Memory/`, `vault/Journal/`.
+- Symlinks `template/skills/*` into `~/.claude/skills/`.
+- Writes a **project-scoped** `.claude/settings.json` (`bypassPermissions` for this folder only — never global) with the hooks.
+- Installs Obsidian.app + `obsidian-cli`, registers the login-item daemon, seeds the morning-brief task, runs `nello-claw audit`.
+
+## Security (state this plainly if they ask)
+- `bypassPermissions` is **project-scoped** — it lives in `<install-folder>/.claude/settings.json`, not `~/.claude/settings.json`. Other projects keep normal prompts.
+- API keys sit in `<install-folder>/.env` in plaintext, `chmod 600` (same trade-off as Ollama/LM Studio). Nothing is uploaded — there is no NELLO server in this flow; you built the bundle locally from the conversation.
+- Skill symlinks point at open-source `SKILL.md` files in `template/skills/`. Read any before approving.
 
 ## Roll back
-
-To completely remove:
 ```bash
 # Mac
 launchctl bootout gui/$(id -u)/com.nello-claw.server
 rm -rf <install-folder>
 rm -f ~/Library/LaunchAgents/com.nello-claw.server.plist
-# Skill symlinks (only the ones that point at nello-claw)
 find ~/.claude/skills -maxdepth 1 -type l -lname '*nello-claw*' -delete
 ```
-
 ```powershell
 # Windows
 schtasks /Delete /F /TN "com.nello-claw.server"
-Remove-Item -Recurse -Force "$HOME\nello-claw"
-Remove-Item "$HOME\Desktop\nello-claw.lnk", "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\nello-claw.lnk"
+Remove-Item -Recurse -Force "<install-folder>"
 ```
 
-## How to verify before installing
-
-1. Read [`template/bootstrap.js`](template/bootstrap.js) - that is the install script
-2. Read [`template/scripts/render-configs.js`](template/scripts/render-configs.js) - what gets written to `.mcp.json`, `claude_desktop_config.json`, and `.claude/settings.json`
-3. Read [`template/CLAUDE.md.hbs`](template/CLAUDE.md.hbs) - what gets written as your assistant's persona
-4. Use Plan Mode in Claude Code (Shift+Tab twice) - your assistant will summarise everything before running
-
-If anything looks wrong, do not approve the plan. Open an issue at github.com/Matthew-Lee-Nello/nello-claw/issues.
+If anything looks wrong, stop and open an issue at github.com/Matthew-Lee-Nello/nello-claw/issues.
