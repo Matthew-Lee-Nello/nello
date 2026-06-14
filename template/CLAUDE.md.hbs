@@ -118,6 +118,8 @@ SQLite at `store/clawd.db` holds short-term conversation memory with dual sector
 
 The SessionStart hook reads `vault/Memory/MEMORY.md`, today's + yesterday's `vault/Journal/` (if present), and `vault/graphify-out/GRAPH_REPORT.md` into every new session. Obsidian provides the graph view + search UI on top of these files.
 
+**agentmemory plugin** is installed for durable, cross-session facts. Reach for its skills (`agentmemory:remember`, `agentmemory:recall`) when a fact must survive beyond the decaying SQLite session memory - preferences, decisions, and standing context you want available on every future session and surface.
+
 ## Vault Taxonomy - {{vaultPreset}}
 
 {{#if (eq vaultPreset "nello")}}

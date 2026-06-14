@@ -110,12 +110,19 @@ export function renderSettingsJson(ctx) {
     effortLevel: 'max',
     enabledPlugins: {
       'andrej-karpathy-skills@karpathy-skills': true,
+      'agentmemory@agentmemory': true,
     },
     extraKnownMarketplaces: {
       'karpathy-skills': {
         source: {
           source: 'github',
           repo: 'forrestchang/andrej-karpathy-skills',
+        },
+      },
+      'agentmemory': {
+        source: {
+          source: 'github',
+          repo: 'rohitg00/agentmemory',
         },
       },
     },
