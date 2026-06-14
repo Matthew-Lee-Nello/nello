@@ -92,9 +92,25 @@ $ObsidianExe = "$env:LOCALAPPDATA\Obsidian\Obsidian.exe"
 
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
   Say "installing Claude Code CLI"
+  # Fatal on a client install: the daemon talks to Claude through the Claude Code
+  # session, and bootstrap installs the agentmemory/karpathy plugins via the CLI.
   npm install -g @anthropic-ai/claude-code 2>$null | Out-Null
+  $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
 }
-if (Get-Command claude -ErrorAction SilentlyContinue) { Ok "claude installed" }
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+  Fail "Claude CLI install failed (npm i -g @anthropic-ai/claude-code). It is required for the daemon + plugin install - install it manually and rerun."
+}
+Ok "claude installed"
+
+# 4a. graphify - the agent's vault navigation layer (community hubs + GRAPH_REPORT.md
+# injected at SessionStart). The PostToolUse hook fires `graphify rebuild --incremental`
+# but no-ops without the binary. npm global. Non-fatal: vault still works as plain markdown.
+if (-not (Get-Command graphify -ErrorAction SilentlyContinue)) {
+  Say "installing graphify (knowledge graph)"
+  npm install -g graphify 2>$null | Out-Null
+  $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
+}
+if (Get-Command graphify -ErrorAction SilentlyContinue) { Ok "graphify installed" } else { Warn "graphify install failed - graph nav disabled until installed manually" }
 
 # 5. Locate bundle
 $BundlePath = if ($env:NC_BUNDLE) { $env:NC_BUNDLE } else { "" }
@@ -149,6 +165,63 @@ Ok "build complete"
 # 9. Run bootstrap
 $env:NC_INSTALL_PATH = $InstallPath
 node (Join-Path $InstallPath "template\bootstrap.js")
+
+# 9a. Fail-closed Telegram assertion (PR-7.1). Bootstrap has rendered .env. An empty
+# ALLOWED_CHAT_ID means the bot ships unlocked (discovery.ts first-message-wins +
+# isAuthorised() with no list). Hard-fail so a misconfigured box can't silently go live.
+$EnvFile = Join-Path $InstallPath ".env"
+$RenderedChatId = ""
+if (Test-Path $EnvFile) {
+  $chatLine = Get-Content $EnvFile | Select-String -Pattern '^ALLOWED_CHAT_ID=' | Select-Object -First 1
+  if ($chatLine) { $RenderedChatId = (($chatLine -split '=', 2)[1]).Trim().Trim('"').Trim("'") }
+}
+if (-not $RenderedChatId) {
+  Fail "ALLOWED_CHAT_ID is empty in $EnvFile. The Telegram bot would ship unlocked (first-message-wins). Re-run the wizard and supply your Telegram chat ID, then reinstall."
+}
+Ok "Telegram locked to chat ID $RenderedChatId"
+
+# 9b. Export NC_INSTALL_PATH + NC_VAULT_PATH user-wide (PR-6 memory bus) so interactive
+# Claude Code (VS Code / terminal) resolves the SAME install + vault as the daemon. setx
+# writes the persistent user environment; also set the live session so anything launched
+# from here inherits them immediately.
+$RenderedVaultPath = Join-Path $InstallPath "vault"
+if (Test-Path $EnvFile) {
+  $vaultLine = Get-Content $EnvFile | Select-String -Pattern '^VAULT_PATH=' | Select-Object -First 1
+  if ($vaultLine) { $RenderedVaultPath = (($vaultLine -split '=', 2)[1]).Trim().Trim('"').Trim("'") }
+}
+setx NC_INSTALL_PATH "$InstallPath" | Out-Null
+setx NC_VAULT_PATH "$RenderedVaultPath" | Out-Null
+$env:NC_VAULT_PATH = $RenderedVaultPath
+Ok "exported NC_INSTALL_PATH + NC_VAULT_PATH to user environment"
+
+# 9c. Ship a VS Code workspace at the install root that pins cwd + the env vars.
+$WorkspaceFile = Join-Path $InstallPath "nello-claw.code-workspace"
+$wsObj = [ordered]@{
+  folders  = @(@{ path = "." })
+  settings = [ordered]@{
+    "terminal.integrated.env.windows" = [ordered]@{
+      NC_INSTALL_PATH = $InstallPath
+      NC_VAULT_PATH   = $RenderedVaultPath
+    }
+  }
+}
+$wsObj | ConvertTo-Json -Depth 6 | Set-Content -Path $WorkspaceFile -Encoding UTF8
+Ok "nello-claw.code-workspace written"
+
+# 9d. Seed the knowledge graph under the VAULT dir (SessionStart injector reads
+# <vault>/graphify-out/GRAPH_REPORT.md). Gated on graphifyEnabled from the bundle.
+$GraphifyEnabled = "1"
+try {
+  $b = Get-Content (Join-Path $InstallPath "bundle.json") -Raw | ConvertFrom-Json
+  if ($b.graphifyEnabled -eq $false) { $GraphifyEnabled = "0" }
+} catch {}
+if ($GraphifyEnabled -ne "0" -and (Get-Command graphify -ErrorAction SilentlyContinue) -and (Test-Path $RenderedVaultPath)) {
+  Say "seeding knowledge graph"
+  Push-Location $RenderedVaultPath
+  try { graphify rebuild --incremental 2>$null | Out-Null } catch { Warn "graphify seed returned non-zero - graph will build on first vault edit" }
+  Pop-Location
+  if (Test-Path (Join-Path $RenderedVaultPath "graphify-out")) { Ok "graphify-out/ seeded in vault" }
+}
 
 # 10. Drop Start Menu + Desktop shortcut (Chrome --app, falls back to Edge)
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\nello-claw.lnk"

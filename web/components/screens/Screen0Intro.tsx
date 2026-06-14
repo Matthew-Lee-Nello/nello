@@ -1,30 +1,39 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useWizard } from '@/lib/store'
+import { useEffect, useState } from 'react'
 import { fireMetaLead } from '@/lib/meta-lead'
 
 const VIDEO_ID = 'MXLgvww5sl4'
 const EMBED_URL = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?rel=0&modestbranding=1&playsinline=1`
 
+// Thin, stable pointer. All install logic lives in the versioned INSTALL_GUIDE.md
+// in the repo, so we change how the install behaves without ever changing the
+// prompt this page hands out. Claude clones, reads the guide, and runs the
+// interview from there.
+const PASTE_PROMPT = `Install nello-claw for me. Clone https://github.com/Matthew-Lee-Nello/nello-claw into the empty folder VS Code has open, then read SECURITY.md and INSTALL_GUIDE.md and follow INSTALL_GUIDE.md — it's an interview that sets me up end to end. Ask me before anything destructive, and adapt the commands to my operating system.`
+
 export default function Screen0Intro() {
-  const { setScreen } = useWizard()
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fireMetaLead()
   }, [])
 
+  const copy = () => {
+    navigator.clipboard.writeText(PASTE_PROMPT)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="screen">
-      <h2 style={{ marginBottom: '0.5rem' }}>1. Watch this first</h2>
+      <h2 style={{ marginBottom: '0.5rem' }}>Watch this, then paste one prompt</h2>
       <p className="intro">
-        Step-by-step walkthrough. Everything you need to get your AI assistant live in under 10 minutes.
+        Two steps. Watch the walkthrough, then copy the prompt below into Claude Code. Your
+        assistant interviews you, sets up everything, and goes live. Around 15 minutes.
       </p>
-      <p
-        className="intro"
-        style={{ marginTop: '0.5rem', fontSize: '0.9em', opacity: 0.8 }}
-      >
-        You'll need Claude Code installed first. Grab it at{' '}
+      <p className="intro" style={{ marginTop: '0.5rem', fontSize: '0.9em', opacity: 0.8 }}>
+        You&apos;ll need Claude Code installed first. Grab it at{' '}
         <a
           href="https://claude.com/claude-code"
           target="_blank"
@@ -54,23 +63,47 @@ export default function Screen0Intro() {
           loading="lazy"
           allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            border: 0,
-          }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
         />
       </div>
 
-      <button
-        type="button"
-        onClick={() => setScreen(1)}
-        style={{ width: '100%', padding: '16px 22px', fontSize: 15, letterSpacing: '0.04em' }}
+      <h3 style={{ marginBottom: '0.5rem' }}>Copy this into Claude Code</h3>
+      <div
+        style={{
+          margin: '8px 0 12px',
+          padding: 12,
+          border: '1px solid var(--accent)',
+          borderRadius: 8,
+          background: 'var(--accent-dim)',
+          fontSize: 13,
+        }}
       >
-        Set it up →
+        <strong style={{ color: 'var(--accent)' }}>First:</strong> open an empty folder in VS Code,
+        then hit{' '}
+        <kbd style={{ background: 'var(--bg)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>
+          Shift+Tab
+        </kbd>{' '}
+        twice in Claude Code to switch on <strong>Plan Mode</strong> — your assistant shows you every
+        step before it runs anything.
+      </div>
+
+      <div
+        className="install-command"
+        onClick={copy}
+        title="Click to copy"
+        style={{ cursor: 'pointer' }}
+      >
+        {PASTE_PROMPT}
+      </div>
+      <button onClick={copy} style={{ width: '100%', padding: '16px 22px', fontSize: 15, letterSpacing: '0.04em' }}>
+        {copied ? 'Copied ✓' : 'Copy prompt'}
       </button>
+
+      <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 16 }}>
+        Your assistant clones the repo, interviews you about your work and tools, walks you through
+        each connection, builds your company brain, and opens the dashboard. When it finishes, send
+        your Telegram bot a message to link your phone.
+      </p>
     </div>
   )
 }

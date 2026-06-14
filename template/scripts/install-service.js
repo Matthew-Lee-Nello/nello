@@ -20,6 +20,21 @@ const TEMPLATE_DIR = join(__dirname, '..')
 const INSTALL = process.env.NC_INSTALL_PATH || join(homedir(), 'nello-claw')
 const LABEL = process.env.NC_LAUNCHAGENT_LABEL || 'com.nello-claw.server'
 
+// Resolve the vault path from the rendered .env so the daemon exports the same
+// NC_VAULT_PATH the interactive surfaces get (PR-6 unified memory bus). Falls back to
+// the conventional <install>/vault.
+function resolveVaultPath() {
+  try {
+    const envPath = join(INSTALL, '.env')
+    if (existsSync(envPath)) {
+      const m = readFileSync(envPath, 'utf-8').match(/^VAULT_PATH=(.+)$/m)
+      if (m) return m[1].replace(/^["']|["']$/g, '').trim()
+    }
+  } catch {}
+  return join(INSTALL, 'vault')
+}
+const VAULT = resolveVaultPath()
+
 // LABEL is interpolated into launchctl/schtasks/systemctl invocations AND into
 // plist/systemd-unit bodies. Restrict to reverse-DNS-style identifiers so it
 // can't break out of any of those contexts. Same regex as bootstrap.js.
@@ -73,6 +88,8 @@ function installMac() {
         <string>${homedir()}</string>
         <key>NC_INSTALL_PATH</key>
         <string>${INSTALL}</string>
+        <key>NC_VAULT_PATH</key>
+        <string>${VAULT}</string>
     </dict>
     <key>ThrottleInterval</key>
     <integer>5</integer>
@@ -161,6 +178,7 @@ Type=simple
 ExecStart=${NODE} ${ENTRY}
 WorkingDirectory=${INSTALL}
 Environment=NC_INSTALL_PATH=${INSTALL}
+Environment=NC_VAULT_PATH=${VAULT}
 Restart=always
 RestartSec=5
 StandardOutput=append:${INSTALL}/store/server.log
