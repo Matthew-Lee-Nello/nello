@@ -105,9 +105,23 @@ ok "pnpm $(pnpm --version)"
 
 if ! command -v claude >/dev/null 2>&1; then
   say "installing Claude Code CLI"
-  npm install -g @anthropic-ai/claude-code >/dev/null 2>&1 || warn "Claude CLI install failed - you can install manually later"
+  # Fatal on a client install: the daemon talks to Claude through the Claude Code
+  # session, and bootstrap installs the agentmemory/karpathy plugins via the CLI.
+  # Without `claude` the install ships a dead brain, so fail loudly here.
+  npm install -g @anthropic-ai/claude-code >/dev/null 2>&1 || fail "Claude CLI install failed (npm i -g @anthropic-ai/claude-code). It is required - install it manually and rerun."
 fi
-command -v claude >/dev/null 2>&1 && ok "claude $(claude --version 2>/dev/null | head -1)"
+command -v claude >/dev/null 2>&1 || fail "claude CLI not on PATH after install. Required for the daemon + plugin install. Fix PATH and rerun."
+ok "claude $(claude --version 2>/dev/null | head -1)"
+
+# 4a. graphify - the agent's vault navigation layer (community hubs + GRAPH_REPORT.md
+# injected at SessionStart). The PostToolUse hook fires `graphify rebuild --incremental`
+# but no-ops without the binary, so the client graph ships dead unless we install it here.
+# It's an npm global. Non-fatal: if the install fails the vault still works as plain markdown.
+if ! command -v graphify >/dev/null 2>&1; then
+  say "installing graphify (knowledge graph)"
+  npm install -g graphify >/dev/null 2>&1 || warn "graphify install failed - vault still works, graph nav disabled until installed manually"
+fi
+command -v graphify >/dev/null 2>&1 && ok "graphify $(graphify --version 2>/dev/null | head -1 || echo installed)"
 
 # 5. Locate bundle
 BUNDLE_PATH="${NC_BUNDLE:-}"
@@ -166,6 +180,78 @@ ok "build complete"
 
 # 9. Run bootstrap
 NC_INSTALL_PATH="$INSTALL_PATH" node "$INSTALL_PATH/template/bootstrap.js"
+
+# 9a. Fail-closed Telegram assertion (PR-7.1). Bootstrap has now rendered .env.
+# If ALLOWED_CHAT_ID is empty, the bot ships unlocked: discovery.ts would re-enter
+# first-message-wins pairing and isAuthorised() would have no list to check. Hard-fail
+# so a misconfigured client box can't silently go live trusting the first sender.
+ENV_FILE="$INSTALL_PATH/.env"
+RENDERED_CHAT_ID=$(grep -E '^ALLOWED_CHAT_ID=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || true)
+if [ -z "$RENDERED_CHAT_ID" ]; then
+  fail "ALLOWED_CHAT_ID is empty in $ENV_FILE. The Telegram bot would ship unlocked (first-message-wins). Re-run the wizard and supply your Telegram chat ID, then reinstall."
+fi
+ok "Telegram locked to chat ID $RENDERED_CHAT_ID"
+
+# 9b. Export NC_INSTALL_PATH + NC_VAULT_PATH user-wide (PR-6 memory bus). The daemon
+# gets these from its launchd/systemd unit, but interactive Claude Code (VS Code /
+# terminal) does not - so its hooks fall back to cwd and read a different, empty memory
+# tree. Appending to the shell rc files makes every interactive surface resolve the SAME
+# install + vault as the daemon. Idempotent: re-running replaces the prior block.
+RENDERED_VAULT_PATH=$(grep -E '^VAULT_PATH=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+RENDERED_VAULT_PATH=${RENDERED_VAULT_PATH:-$INSTALL_PATH/vault}
+NC_ENV_BEGIN="# >>> nello-claw env >>>"
+NC_ENV_END="# <<< nello-claw env <<<"
+for RC in "$HOME/.zshrc" "$HOME/.bashrc"; do
+  # Only touch an rc file that exists or whose shell is the login shell, to avoid
+  # creating stray files. Always (re)write zshrc on macOS where zsh is default.
+  if [ -f "$RC" ] || { [ "$RC" = "$HOME/.zshrc" ] && [[ "$(uname)" == "Darwin" ]]; }; then
+    # Strip any prior nello-claw block, then append the fresh one.
+    if [ -f "$RC" ]; then
+      TMP_RC=$(mktemp)
+      awk -v b="$NC_ENV_BEGIN" -v e="$NC_ENV_END" '
+        $0==b {skip=1} skip && $0==e {skip=0; next} !skip {print}
+      ' "$RC" > "$TMP_RC" && mv "$TMP_RC" "$RC"
+    fi
+    {
+      printf '%s\n' "$NC_ENV_BEGIN"
+      printf 'export NC_INSTALL_PATH=%q\n' "$INSTALL_PATH"
+      printf 'export NC_VAULT_PATH=%q\n' "$RENDERED_VAULT_PATH"
+      printf '%s\n' "$NC_ENV_END"
+    } >> "$RC"
+  fi
+done
+ok "exported NC_INSTALL_PATH + NC_VAULT_PATH to shell rc files"
+
+# 9c. Ship a VS Code workspace at the install root that pins cwd + the env vars, so
+# "open in VS Code" lands interactive Claude Code on the same install + vault as the daemon.
+cat > "$INSTALL_PATH/nello-claw.code-workspace" <<WORKSPACE
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "terminal.integrated.env.osx": {
+      "NC_INSTALL_PATH": "$INSTALL_PATH",
+      "NC_VAULT_PATH": "$RENDERED_VAULT_PATH"
+    },
+    "terminal.integrated.env.linux": {
+      "NC_INSTALL_PATH": "$INSTALL_PATH",
+      "NC_VAULT_PATH": "$RENDERED_VAULT_PATH"
+    }
+  }
+}
+WORKSPACE
+ok "nello-claw.code-workspace written"
+
+# 9d. Seed the knowledge graph (graphify). The binary was installed as a prereq; seed
+# graphify-out/ under the VAULT dir (not the install root) because the SessionStart
+# injector reads <vault>/graphify-out/GRAPH_REPORT.md and the PostToolUse hook writes
+# there with cwd=vault. Same subcommand family as the hook. Gated on graphifyEnabled
+# (read from the bundle). Non-fatal: an empty seed is fine, the graph grows from edits.
+GRAPHIFY_ENABLED=$(node -e "try{const b=require('$INSTALL_PATH/bundle.json');process.stdout.write(b.graphifyEnabled===false?'0':'1')}catch{process.stdout.write('1')}" 2>/dev/null || echo 1)
+if [ "$GRAPHIFY_ENABLED" != "0" ] && command -v graphify >/dev/null 2>&1 && [ -d "$RENDERED_VAULT_PATH" ]; then
+  say "seeding knowledge graph"
+  ( cd "$RENDERED_VAULT_PATH" && graphify rebuild --incremental >/dev/null 2>&1 ) || warn "graphify seed returned non-zero - graph will build on first vault edit"
+  if [ -d "$RENDERED_VAULT_PATH/graphify-out" ]; then ok "graphify-out/ seeded in vault"; fi
+fi
 
 # 10. Drop app-mode shortcut on Mac (with icon)
 if [[ "$(uname)" == "Darwin" ]]; then
