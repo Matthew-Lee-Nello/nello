@@ -1,0 +1,22 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "//": "Open THIS workspace (not a random folder) so interactive Claude Code lands on the install dir and resolves the SAME memory stores + vault as the daemon (PR-6 unified memory bus). The installer rewrites this file at install time with the absolute NC_INSTALL_PATH / NC_VAULT_PATH for this box; the values below are the in-repo placeholders.",
+    "terminal.integrated.env.osx": {
+      "NC_INSTALL_PATH": "${workspaceFolder}",
+      "NC_VAULT_PATH": "${workspaceFolder}/vault"
+    },
+    "terminal.integrated.env.linux": {
+      "NC_INSTALL_PATH": "${workspaceFolder}",
+      "NC_VAULT_PATH": "${workspaceFolder}/vault"
+    },
+    "terminal.integrated.env.windows": {
+      "NC_INSTALL_PATH": "${workspaceFolder}",
+      "NC_VAULT_PATH": "${workspaceFolder}\\vault"
+    }
+  }
+}
