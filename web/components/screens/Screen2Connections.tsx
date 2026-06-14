@@ -7,8 +7,13 @@ export default function Screen2Connections() {
   const { bundle, update } = useWizard()
   const setKey = (k: string, v: string) => update({ keys: { ...bundle.keys, [k]: v } })
 
+  // Telegram chat ID is a top-level bundle field (telegramChatId, PR-7.1). We
+  // also mirror it into keys.ALLOWED_CHAT_ID so bootstrap's legacy fallback +
+  // the .env render both see it regardless of which path is read first.
+  const setChatId = (v: string) => update({ telegramChatId: v, keys: { ...bundle.keys, ALLOWED_CHAT_ID: v } })
+
   const tg = bundle.keys.TELEGRAM_BOT_TOKEN ?? ''
-  const chatId = bundle.keys.ALLOWED_CHAT_ID ?? ''
+  const chatId = bundle.telegramChatId || (bundle.keys.ALLOWED_CHAT_ID ?? '')
   const email = bundle.keys.GOOGLE_USER_EMAIL ?? ''
   const cid = bundle.keys.GOOGLE_OAUTH_CLIENT_ID ?? ''
   const secret = bundle.keys.GOOGLE_OAUTH_CLIENT_SECRET ?? ''
@@ -51,7 +56,7 @@ export default function Screen2Connections() {
           type="text"
           inputMode="numeric"
           value={chatId}
-          onChange={e => setKey('ALLOWED_CHAT_ID', e.target.value)}
+          onChange={e => setChatId(e.target.value)}
           placeholder="e.g. 123456789"
         />
         <div className="panel-help">

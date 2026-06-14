@@ -5,7 +5,7 @@ import { WebSocketServer } from 'ws'
 import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DASHBOARD_PORT, logger, addLogTap } from '@nc/core'
+import { DASHBOARD_PORT, DASHBOARD_TOKEN, logger, addLogTap } from '@nc/core'
 import { chatRouter } from './routes/chat.js'
 import { cronRouter } from './routes/cron.js'
 import { monitoringRouter } from './routes/monitoring.js'
@@ -34,10 +34,61 @@ const ALLOWED_DASHBOARD_ORIGINS = [
   'http://127.0.0.1:5173',
 ]
 
+// Pull the dashboard token out of an incoming request. Order of preference:
+// Authorization: Bearer <t>, the x-dashboard-token header, a ?token=<t> query
+// (used once to bootstrap the SPA from a link), then the nc_dash cookie.
+function extractToken(req: { headers: Record<string, unknown>; query?: Record<string, unknown> }): string | null {
+  const auth = req.headers['authorization']
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim()
+  const hdr = req.headers['x-dashboard-token']
+  if (typeof hdr === 'string' && hdr) return hdr.trim()
+  const q = req.query?.['token']
+  if (typeof q === 'string' && q) return q.trim()
+  const cookie = req.headers['cookie']
+  if (typeof cookie === 'string') {
+    for (const part of cookie.split(';')) {
+      const [k, ...v] = part.trim().split('=')
+      if (k === 'nc_dash') return decodeURIComponent(v.join('=')).trim()
+    }
+  }
+  return null
+}
+
+// Constant-time-ish compare to avoid leaking length/byte timing. Both empty =
+// caller's job to have rejected first; here a missing expected token means the
+// gate is open (dev/legacy installs without a token in .env).
+function tokenMatches(provided: string | null): boolean {
+  if (!DASHBOARD_TOKEN) return true
+  if (!provided || provided.length !== DASHBOARD_TOKEN.length) return false
+  let diff = 0
+  for (let i = 0; i < provided.length; i++) diff |= provided.charCodeAt(i) ^ DASHBOARD_TOKEN.charCodeAt(i)
+  return diff === 0
+}
+
 export function startDashboard(): DashboardHandle {
   const app = express()
   app.use(cors({ origin: ALLOWED_DASHBOARD_ORIGINS }))
   app.use(express.json({ limit: '200mb' }))
+
+  // Token gate. Mounted BEFORE the API routers AND express.static so an
+  // unauthed device gets 401 on both an API call and the SPA shell ('/'),
+  // never a 200 + the app. Skipped entirely when DASHBOARD_TOKEN is empty
+  // (dev / legacy installs). On a valid ?token= query we set an httpOnly
+  // cookie so the SPA's subsequent asset + XHR loads pass without the query.
+  if (DASHBOARD_TOKEN) {
+    app.use((req, res, next) => {
+      const provided = extractToken(req)
+      if (!tokenMatches(provided)) {
+        res.status(401).json({ error: 'unauthorised - append ?token=<your DASHBOARD_TOKEN> once' })
+        return
+      }
+      // Promote a valid query token to a cookie so reloads/asset fetches work.
+      if (typeof req.query?.['token'] === 'string' && req.query['token']) {
+        res.setHeader('Set-Cookie', `nc_dash=${encodeURIComponent(String(req.query['token']))}; HttpOnly; SameSite=Strict; Path=/`)
+      }
+      next()
+    })
+  }
 
   // CSRF-by-Origin guard. CORS sets headers but the browser only enforces them
   // for cross-origin XHR fetches; HTML form POSTs and SSE/WS upgrades aren't
@@ -68,7 +119,22 @@ export function startDashboard(): DashboardHandle {
   const server = createServer(app)
   const wss = new WebSocketServer({ server, path: '/ws' })
 
-  wss.on('connection', (ws) => {
+  // Gate the WS upgrade with the same token. The ws library hands us the raw
+  // upgrade request; reuse extractToken (Authorization header / cookie /
+  // ?token= on the ws:// URL). Without this the chat WebSocket would be an
+  // unauthed channel into the bypassPermissions agent.
+  wss.on('connection', (ws, req) => {
+    if (DASHBOARD_TOKEN) {
+      const url = new URL(req.url || '/', 'http://localhost')
+      const provided = extractToken({
+        headers: req.headers as Record<string, unknown>,
+        query: { token: url.searchParams.get('token') ?? undefined },
+      })
+      if (!tokenMatches(provided)) {
+        try { ws.close(1008, 'unauthorised') } catch { /* ignore */ }
+        return
+      }
+    }
     const sub: ClientSub = { ws, chatId: null, wantLogs: false }
     subs.add(sub)
     ws.on('message', (data) => {
@@ -125,7 +191,11 @@ export function startDashboard(): DashboardHandle {
         throw err
       }
     })
-    server.listen(port, () => {
+    // Bind to loopback only. The daemon + dashboard chat route run with
+    // bypassPermissions, so a 0.0.0.0 bind exposed RCE to the LAN. Tailscale
+    // serve still reaches the dashboard by proxying from the tailnet into
+    // 127.0.0.1, gated by the token middleware above.
+    server.listen(port, '127.0.0.1', () => {
       actualPort = port
       logger.info({ port }, 'Dashboard listening')
     })

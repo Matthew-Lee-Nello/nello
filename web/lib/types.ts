@@ -51,6 +51,11 @@ export interface Bundle {
     exa?: boolean
   }
 
+  // Telegram owner lock (PR-7.1). The numeric chat ID the bot is allowed to
+  // talk to. Flows into .env ALLOWED_CHAT_ID at install so the allowlist is
+  // never empty (disables first-message-wins discovery + feeds isAuthorised()).
+  telegramChatId: string
+
   installTelegram: boolean
   installDashboard: boolean
   installLaunchAgent: boolean

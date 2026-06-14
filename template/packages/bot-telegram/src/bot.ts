@@ -31,7 +31,10 @@ export function createBot(deps: BotDeps = {}): Bot {
 
   function isAuthorised(chatId: number | string): boolean {
     const id = String(chatId)
-    if (ALLOWED_CHAT_IDS.length === 0) return true  // first-run mode (lockdown after chat ID is set)
+    // Fail-closed: an empty allowlist denies everyone. On a client box the
+    // installer pre-writes ALLOWED_CHAT_ID, so the list is never empty in
+    // practice; if it somehow is, we must NOT trust the first sender.
+    if (ALLOWED_CHAT_IDS.length === 0) return false
     return ALLOWED_CHAT_IDS.includes(id)
   }
 

@@ -38,7 +38,14 @@ export const DEFAULT_BUNDLE: Bundle = {
   enableAiHumanizer: true,
 
   // User-entered (Screen 2 - Connections)
-  keys: {},
+  keys: {
+    // labs.nello.gg injects NELLO's shared OAuth client_id/secret server-side at
+    // bundle-compile; never commit real values to this public repo. Empty here so
+    // the client only supplies their own Google EMAIL (GOOGLE_USER_EMAIL); tokens
+    // cache locally under that email and never leave the box.
+    GOOGLE_OAUTH_CLIENT_ID: '',
+    GOOGLE_OAUTH_CLIENT_SECRET: '',
+  },
 
   // Four integrations the install ships with. Connections that work without
   // keys (Obsidian) + the ones we collect keys for (Google, Exa).
@@ -48,6 +55,11 @@ export const DEFAULT_BUNDLE: Bundle = {
     exa: true,
     obsidian: true,
   },
+
+  // Telegram owner lock (PR-7.1) - collected on Screen 2, written to .env
+  // ALLOWED_CHAT_ID at install. Empty here; the installer hard-fails if it
+  // stays empty so a client box never ships an unlocked bot.
+  telegramChatId: '',
 
   // Surfaces - all on, no user choice
   installTelegram: true,

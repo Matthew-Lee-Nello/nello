@@ -46,3 +46,6 @@ export const AUTH_REFRESH_MS = 12 * 60 * 60 * 1000   // 12h
 
 // Dashboard
 export const DASHBOARD_PORT = parseInt(env['DASHBOARD_PORT'] ?? '3000', 10)
+// Install-generated bearer token gating the dashboard. The installer writes a
+// random value into .env; an empty token disables the gate (dev/legacy only).
+export const DASHBOARD_TOKEN = env['DASHBOARD_TOKEN'] ?? ''
