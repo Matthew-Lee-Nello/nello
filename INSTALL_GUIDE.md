@@ -69,20 +69,13 @@ Three services everyone gets: **Telegram** (the assistant texts them), **Google*
    - Validate against `^-?\d{5,}$`.
    - → `telegramChatId` **and** `keys.ALLOWED_CHAT_ID` (set both to the same value - this is the owner lock). The bootstrap hard-fails if a bot token is present but this is empty, so the bot never ships open to the world. Don't work around that failure by inventing a value - go get the real chat ID.
 
-### 4b. Google (their own OAuth app - ~10 min, one time)
-They create their own Google Cloud app so their data stays theirs. Walk it slowly:
+### 4b. Connections (via Composio Tool Router - no Google Cloud setup)
+Every app (Gmail, Calendar, Drive, Docs, Sheets, plus Slack, Notion, CRMs - 1000+) connects through one **Composio Tool Router** with a single OAuth click each. No Google Cloud project, no consent screen, no client-id/secret. The actual app connections happen after install (Step 7), by the assistant itself. You collect just two values here:
 
-1. Go to **console.cloud.google.com**. Create a new project (top bar → project dropdown → New project), name it anything (e.g. "my-assistant"), select it.
-2. **Enable the APIs** they'll use. Search each in the top bar and click Enable: **Gmail API**, **Google Calendar API**, **Google Drive API**, **Google Docs API**, **Google Sheets API**.
-3. **OAuth consent screen** (left menu → APIs & Services → OAuth consent screen): choose **External**, give it an app name, put their own email as support + developer contact, save.
-4. **Add themselves as a test user:** on the consent screen / Audience tab → **Test users** → add their Google email. (Skipping this is the #1 reason Google auth fails later - an unverified app only works for listed test users.)
-5. **Create the credential:** APIs & Services → Credentials → **Create credentials → OAuth client ID → Application type: Desktop app** → Create. Copy the **Client ID** and **Client secret**.
-6. Collect and validate:
-   - `keys.GOOGLE_USER_EMAIL` - their Google address (email format).
-   - `keys.GOOGLE_OAUTH_CLIENT_ID` - length > 30 or ends `apps.googleusercontent.com`.
-   - `keys.GOOGLE_OAUTH_CLIENT_SECRET` - length > 20.
+1. `keys.COMPOSIO_API_KEY` - the Composio **project** API key (NELLO provides one; or make one at **dashboard.composio.dev**). The only Composio value anyone pastes.
+2. `keys.GOOGLE_USER_EMAIL` - their email address. Doubles as their Composio `user_id`, so all their connections live under it.
 
-If Google auth errors after install, the usual fixes are: they weren't added as a test user (Step 4), or the OAuth client type didn't match what `workspace-mcp` expects - check the `workspace-mcp` README for the current redirect/client-type and recreate the credential.
+The installer mints this client's durable router URL (`COMPOSIO_MCP_URL`) from the key automatically during bootstrap, with delete/trash blocked - you do NOT paste a URL. Validate: `COMPOSIO_API_KEY` starts `ak_`, `GOOGLE_USER_EMAIL` is a valid email. Nothing to paste from Google at all.
 
 ### 4c. Exa
 1. Go to **dashboard.exa.ai**, sign up (free tier is fine), copy an API key.
@@ -106,10 +99,10 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
   "communicationStyle": "direct", "language": "AU",
   "emDashPolicy": "never", "oxfordComma": false, "bannedWords": [],
   "vaultPreset": "nello", "graphifyEnabled": true,
-  "mcps": { "google": true, "obsidian": true, "exa": true },
+  "mcps": { "composio": true, "obsidian": true, "exa": true },
   "keys": {
     "TELEGRAM_BOT_TOKEN": "", "ALLOWED_CHAT_ID": "",
-    "GOOGLE_USER_EMAIL": "", "GOOGLE_OAUTH_CLIENT_ID": "", "GOOGLE_OAUTH_CLIENT_SECRET": "",
+    "GOOGLE_USER_EMAIL": "", "COMPOSIO_API_KEY": "",
     "EXA_API_KEY": ""
   },
   "telegramChatId": "",
@@ -121,7 +114,7 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
 }
 ```
 
-`tools` is the plain list of what their business runs on (you'll fill it in Step 7). The baseline `mcps` trio (google / obsidian / exa) ships for everyone - leave those on.
+`tools` is the plain list of what their business runs on (you'll fill it in Step 7). The baseline `mcps` trio (composio / obsidian / exa) ships for everyone - leave those on. Composio is the one connection layer for every OAuth app, so there's no per-app MCP to wire.
 
 ---
 
@@ -133,14 +126,17 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
 
 ---
 
-## Step 7 - Their tool stack (the part that makes every client different)
+## Step 7 - Connect their apps (the assistant does this itself)
 
-Two clients are never the same. Now wire what *this* one runs on.
+The Tool Router wired in Step 4b reaches 1000+ apps. There is no per-app MCP to install and no credential to paste - the **assistant connects apps itself** by calling its `COMPOSIO_MANAGE_CONNECTIONS` tool.
 
-1. Ask: **"Beyond Google, what does your business actually run on day to day?"** Slack, Notion, HubSpot, Salesforce, Linear, GitHub, Stripe, Xero, Apify - whatever they name. Record the list into `tools` (re-run the relevant render or note it for CLAUDE.md context).
-2. For **each** tool they named, wire it the proper way using the bundled **`mcp-implement`** skill (read `~/.claude/skills/mcp-implement/SKILL.md`): vet the server (via `find-skill`'s checklist) → classify stateless/stateful → install pinned (never `npx -y` in the saved config) → add it to **this install's** `.mcp.json` + `claude_desktop_config.json` → collect that tool's credentials the same paste-and-validate way → **verify with one real read-only tool call** → restart the daemon.
-3. Anything with no known MCP → fall back to `find-skill` discovery, vet, install.
-4. Don't over-collect. Wire what they'll use this week; tell them they can add more anytime by saying *"find me a connection for X."*
+So you (or the owner, anytime after install) just say to the assistant:
+
+> "Connect my Gmail and Calendar." / "Connect Slack." / "Give me a link for Notion."
+
+The assistant returns a `https://connect.composio.dev/link/...` URL; they open it, approve, done. From then on the assistant can read / send / create on that app - but **cannot delete or trash** (blocked server-side).
+
+Start them off by connecting `gmail` + `googlecalendar`; add the rest as needed. Genuinely niche or in-house systems not in Composio's catalogue are the only case for the bundled `mcp-implement` skill - Composio first, `mcp-implement` only for the gaps.
 
 ---
 

@@ -22,10 +22,17 @@ export const ALLOWED_CHAT_IDS = (env['ALLOWED_CHAT_ID'] ?? '')
 // Voice
 export const GROQ_API_KEY = env['GROQ_API_KEY'] ?? ''
 
+// Composio Tool Router - the connection layer (Gmail, Calendar, Drive, Slack, Notion +
+// 1000 apps). COMPOSIO_MCP_URL is the per-client durable router URL minted by
+// scripts/composio-provision.py (destructiveHint disabled = no delete/trash). The agent
+// searches + runs any app's tools through it. COMPOSIO_API_KEY is the project key (the
+// only Composio secret on this machine).
+export const COMPOSIO_API_KEY = env['COMPOSIO_API_KEY'] ?? ''
+export const COMPOSIO_MCP_URL = env['COMPOSIO_MCP_URL'] ?? ''
+export const COMPOSIO_USER_ID = env['COMPOSIO_USER_ID'] ?? (env['GOOGLE_USER_EMAIL'] ?? '')
+
 // Optional integrations
 export const OPENAI_API_KEY = env['OPENAI_API_KEY'] ?? ''
-export const GOOGLE_OAUTH_CLIENT_ID = env['GOOGLE_OAUTH_CLIENT_ID'] ?? ''
-export const GOOGLE_OAUTH_CLIENT_SECRET = env['GOOGLE_OAUTH_CLIENT_SECRET'] ?? ''
 export const GOOGLE_USER_EMAIL = env['GOOGLE_USER_EMAIL'] ?? ''
 export const FIRECRAWL_API_KEY = env['FIRECRAWL_API_KEY'] ?? ''
 export const EXA_API_KEY = env['EXA_API_KEY'] ?? ''

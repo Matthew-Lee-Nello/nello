@@ -85,7 +85,7 @@ function toPosixPath(p) {
 // needs a row here too — otherwise the bullet shows the name with an
 // empty purpose.
 const MCP_PURPOSES = {
-  google: 'Gmail, Calendar, Drive, Docs, Sheets via workspace-mcp',
+  composio: 'Gmail, Calendar, Drive, Docs, Sheets + 250 more apps - one-click OAuth, no Google Cloud setup',
   obsidian: 'read/write your vault directly',
   exa: 'web research with citations',
   apify: 'web scraping + Actor marketplace',
@@ -196,7 +196,7 @@ function writeEnv(bundle) {
 // from render-configs.js. .mcp.json and claude_desktop_config.json have
 // different baseline sets, so each call passes its own renderer's set.
 function managedMcpKeys(renderFn) {
-  const allOn = { mcps: { google: true, obsidian: true, exa: true, apify: true, tavily: true, firecrawl: true }, env: {}, vaultPath: '' }
+  const allOn = { mcps: { composio: true, obsidian: true, exa: true, apify: true, tavily: true, firecrawl: true }, env: {}, vaultPath: '' }
   return new Set(Object.keys(renderFn(allOn).mcpServers || {}))
 }
 
@@ -757,6 +757,27 @@ async function main() {
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
   validateBundle(bundle)
+
+  // Composio: the only value collected is the API key. Mint this install's durable
+  // Tool Router URL from it automatically (destructiveHint disabled = no delete/trash),
+  // so nobody pastes a URL. Skip if one was already provided (wizard pre-provisioned).
+  if (bundle.keys?.COMPOSIO_API_KEY && !bundle.keys?.COMPOSIO_MCP_URL) {
+    const userId = bundle.keys.COMPOSIO_USER_ID || bundle.keys.GOOGLE_USER_EMAIL
+    if (!userId) {
+      fail('COMPOSIO_API_KEY set but no COMPOSIO_USER_ID / GOOGLE_USER_EMAIL to key the connections to.')
+      process.exit(1)
+    }
+    info('Provisioning Composio Tool Router (no delete/trash)')
+    const { provisionRouterUrl } = await import('./scripts/composio-provision.mjs')
+    try {
+      bundle.keys.COMPOSIO_MCP_URL = await provisionRouterUrl(bundle.keys.COMPOSIO_API_KEY, userId)
+      ok('Composio router ready')
+    } catch (err) {
+      fail(`Composio provisioning failed: ${err.message?.split('\n')[0] || err}`)
+      process.exit(1)
+    }
+  }
+
   const ctx = buildContext(bundle)
   validateVaultPath(ctx.vaultPath)
 
