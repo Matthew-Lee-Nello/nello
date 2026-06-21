@@ -6,12 +6,12 @@ How nello-claw treats your data, what permissions it touches, and what to verify
 
 Everything. nello-claw is a local-only tool.
 
-- API keys: paste them into the wizard at labs.nello.gg → bundle file is downloaded directly to your `~/Downloads/` folder. The wizard runs in your browser; the keys never travel to a NELLO Labs server.
+- API keys: you hand them to your assistant during the Claude Code install interview. It writes them into `<install-folder>/.env` (chmod 600) and assembles `<install-folder>/bundle.json` locally from the conversation. Nothing is typed into a browser, downloaded, or sent to a NELLO Labs server.
 - Conversations with your assistant: SQLite database at `~/nello-claw/store/clawd.db` on your machine.
 - Your notes / vault: `~/nello-claw/vault/` (or wherever you pointed at) on your machine.
 - Memory + context: same SQLite DB.
 
-NELLO Labs operates `labs.nello.gg` (the wizard) and the public GitHub repo. We do not have a backend that receives or stores your data.
+NELLO Labs operates `labs.nello.gg` and the public GitHub repo. We do not have a backend that receives or stores your data.
 
 ## What the install touches on your machine
 
@@ -27,10 +27,12 @@ Outside the install folder:
 - `~/Applications/nello-claw.app` (Mac) or Start Menu + Desktop shortcuts (Windows) — open the dashboard in app-mode
 
 System-level packages installed if missing (uses your existing package manager, prompts for password when the package manager does):
-- **Mac:** Homebrew (if missing), `node@20`, `git`, `uv`, `obsidian` cask (installs Obsidian.app to `/Applications/`)
-- **Windows:** `OpenJS.NodeJS.LTS`, `Git.Git`, `astral-sh.uv`, `Obsidian.Obsidian` via `winget`
+- **Mac:** Homebrew (if missing), `node@20`, `git`, `uv`
+- **Windows:** `OpenJS.NodeJS.LTS`, `Git.Git`, `astral-sh.uv` via `winget`
 - **Linux:** `nodejs` via `apt-get`, `uv` via `astral.sh` script
-- **All platforms:** `pnpm`, `@anthropic-ai/claude-code`, `obsidian-cli` via `npm install -g`
+- **All platforms:** `pnpm`, `obsidian-cli` via `npm install -g`
+
+Claude Code, VS Code and Obsidian are manual prerequisites you install yourself (claude.com/claude-code, code.visualstudio.com, obsidian.md/download). The installer does not download them.
 
 It does NOT touch:
 - Your global `~/.claude/settings.json`
@@ -59,14 +61,14 @@ Plaintext, in `~/nello-claw/.env`. Permissions set to `0600` (read/write owner o
 
 This matches every other local AI tool with API keys — nothing exotic. If your laptop disk is encrypted (FileVault on Mac, BitLocker on Windows), your keys are encrypted at rest along with everything else.
 
-The bundle file at `~/Downloads/nello-claw-bundle.json` also contains plaintext keys until you delete it. The installer leaves it in place so you can verify what was in it. Delete it yourself after install:
+The `bundle.json` your assistant assembled in the install folder also contains plaintext keys until you delete it. The installer leaves it in place so you can verify what was in it (it also prints the exact path). Delete it yourself after install:
 
 ```bash
 # Mac/Linux
-rm ~/Downloads/nello-claw-bundle.json
+rm <install-folder>/bundle.json
 
 # Windows
-del %USERPROFILE%\Downloads\nello-claw-bundle.json
+del <install-folder>\bundle.json
 ```
 
 ## How to verify the install before approving
@@ -77,7 +79,6 @@ del %USERPROFILE%\Downloads\nello-claw-bundle.json
    - [`template/bootstrap.js`](template/bootstrap.js) — the install script
    - [`template/scripts/render-configs.js`](template/scripts/render-configs.js) — what gets written to `.mcp.json`, `claude_desktop_config.json`, and project-scoped `.claude/settings.json`
    - [`template/CLAUDE.md.hbs`](template/CLAUDE.md.hbs) — your assistant's persona
-   - [`installer/install.sh`](installer/install.sh) / [`installer/install.ps1`](installer/install.ps1) — only used if you take the bash/PowerShell fallback path
 
 3. The install runs `pnpm install` and `pnpm -r build`. Standard Node ecosystem dependency tree. You can audit it with `pnpm audit` after install.
 

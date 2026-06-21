@@ -33,16 +33,14 @@ export default function Screen0Intro() {
         assistant interviews you, sets up everything, and goes live. Around 15 minutes.
       </p>
       <p className="intro" style={{ marginTop: '0.5rem', fontSize: '0.9em', opacity: 0.8 }}>
-        You&apos;ll need Claude Code installed first. Grab it at{' '}
-        <a
-          href="https://claude.com/claude-code"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: 'var(--ink)', textDecoration: 'underline' }}
-        >
-          claude.com/claude-code
-        </a>
-        .
+        Install three free apps first - that is everything you set up by hand; your assistant
+        installs the rest.{' '}
+        <a href="https://claude.com/claude-code" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>Claude Code</a>{' '}
+        (the engine that does the work),{' '}
+        <a href="https://code.visualstudio.com/download" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>VS Code</a>{' '}
+        (to open your project folder), and{' '}
+        <a href="https://obsidian.md/download" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>Obsidian</a>{' '}
+        (where your assistant keeps its memory).
       </p>
 
       <div

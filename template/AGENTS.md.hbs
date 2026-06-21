@@ -21,6 +21,7 @@ The SessionStart hook at `scripts/inject-brain-context.sh` cats 4-7 into every s
 - For any vault write: follow the `{{vaultPreset}}` taxonomy
 - For any memory write: update `MEMORY.md` index too
 - For any scheduled task: use `npm run schedule -- create`
+- For any new key or integration: `.env` is the single source of truth - write the key there, then run `scripts/sync-env-to-configs.sh` to regenerate the MCP configs. Connect catalogue apps with `COMPOSIO_MANAGE_CONNECTIONS`; never hand-edit `.mcp.json` or `claude_desktop_config.json`.
 
 ## Error Handling
 

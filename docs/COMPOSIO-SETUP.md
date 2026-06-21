@@ -26,11 +26,11 @@ Only the key. The router URL is minted automatically.
 
 `bootstrap.js` calls `provisionRouterUrl()` from `template/scripts/composio-provision.mjs` (pure Node fetch, no Python, no SDK) when `COMPOSIO_API_KEY` is set and `COMPOSIO_MCP_URL` is empty. It `POST`s `https://backend.composio.dev/api/v3.1/tool_router/session` with `{user_id, manage_connections:{enable:true}, tags:{disable:["destructiveHint"]}}` and stores the returned URL. So the only Composio thing collected at install is the API key.
 
-Run it standalone (or from the labs.nello.gg wizard to pre-provision) with:
+Run it standalone (bootstrap calls it automatically; this is for manual or debug runs) with:
 ```
 COMPOSIO_API_KEY=ak_xxx node template/scripts/composio-provision.mjs <client_email>
 ```
-If the wizard pre-sets `COMPOSIO_MCP_URL`, bootstrap skips the call.
+If `COMPOSIO_MCP_URL` is already set in `.env`, bootstrap skips the call.
 
 ## PRODUCTION CAVEAT - per-client project isolation (hardening TODO)
 

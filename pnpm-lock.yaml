@@ -8,8 +8,6 @@ importers:
 
   .: {}
 
-  installer: {}
-
   template:
     dependencies:
       '@nc/audit':

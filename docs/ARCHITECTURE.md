@@ -1,10 +1,9 @@
 # nello-claw Architecture
 
-## Three deliverables
+## Two deliverables
 
-1. **`web/`** — Next.js app hosted at labs.nello.gg. Runs the 7-screen Brain Method wizard.
-2. **`installer/`** — bash one-liner + node bootstrap that users paste into their Terminal.
-3. **`template/`** — monorepo of runtime packages cloned onto the user's Mac.
+1. **`web/`** — Next.js app hosted at labs.nello.gg. Hands the user one install prompt to paste into Claude Code.
+2. **`template/`** — monorepo of runtime packages cloned onto the user's Mac; `template/bootstrap.js` runs the install.
 
 ## End-to-end flow
 
@@ -13,22 +12,16 @@
 │ User visits             │
 │ labs.nello.gg/wizard    │
 └───────────┬─────────────┘
-            │ 7 screens of questions
+            │ copies one install prompt
             ▼
 ┌────────────────────────┐
-│ Browser compiles        │  Bundle.json written to ~/Downloads/
-│ bundle client-side      │  API keys never leave the browser
+│ Paste into Claude Code  │  clones the repo into the open VS Code folder,
+│ (Plan Mode)             │  reads SECURITY.md + INSTALL_GUIDE.md
 └───────────┬─────────────┘
-            │ Build My Brain
+            │ INSTALL_GUIDE interview: identity + business + keys
             ▼
 ┌────────────────────────┐
-│ curl | bash             │  installer/install.sh
-│ in Terminal             │
-└───────────┬─────────────┘
-            │ clone template + pnpm install + pnpm build
-            ▼
-┌────────────────────────┐
-│ template/bootstrap.js   │  Renders every .hbs with bundle values.
+│ template/bootstrap.js   │  Renders every .hbs with the interview values.
 │                         │  Writes CLAUDE.md, .env, .mcp.json.
 │                         │  Seeds vault from chosen preset.
 │                         │  Symlinks 11 skills into ~/.claude/skills/.
@@ -108,21 +101,21 @@ All three get injected into the session by the SessionStart hook.
 | update-config | Edit settings.json safely |
 | fewer-permission-prompts | Build allowlist from transcripts |
 
-Tier 2 are opt-in checkboxes on screen 7 (mcp-builder, process-transcript, etc.). Tier 3 is plugin markets (andrej-karpathy-skills, caveman) registered in settings.json.
+Tier 2 are opt-in during the install interview (mcp-builder, process-transcript, etc.). Tier 3 is plugin markets (andrej-karpathy-skills, caveman) registered in settings.json.
 
 ## Vault presets
 
 - **NELLO** - dense prefix taxonomy with wikilinks. Matt's system.
 - **PARA** - Projects / Areas / Resources / Archive. Tiago Forte.
 - **Zettelkasten** - atomic notes with unique ID prefixes.
-- **Custom** - user defines their own prefixes in the wizard.
+- **Custom** - user defines their own prefixes during the install interview.
 
 Each preset has a `VAULT-RULES.md` (or `Resource-Vault-Rules.md` for NELLO), an `Inbox.md`, any starter MOCs, and a `_stubs/` directory for dynamic note creation later.
 
 ## Security
 
-- API keys compiled in the browser via client-side Handlebars. The edge API only hands out install tokens.
-- Installer reads bundle from `~/Downloads/` on user's machine. Never fetched from server.
+- API keys are collected conversationally by the assistant during the INSTALL_GUIDE interview and written to `.env`. They never touch the browser or a NELLO server.
+- Installer reads `<install-folder>/bundle.json`, assembled locally by the assistant from the interview. Never fetched from a server.
 - Keys live in `~/nello-claw/.env` with `chmod 600`. 
 - LaunchAgent runs as user, no privileged access.
 

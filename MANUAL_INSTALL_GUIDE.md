@@ -8,7 +8,7 @@ If you skip the wizard, you fill out the same answers conversationally inside Cl
 
 ## How it differs from the wizard install
 
-The wizard collects your answers in a browser then writes them to a JSON file at `~/Downloads/nello-claw-bundle.json`. The manual flow asks you the same questions in chat instead.
+The `labs.nello.gg/wizard` page is just the walkthrough video plus the install prompt to copy. Both paths collect your answers conversationally inside Claude Code; the only difference is which prompt you paste.
 
 Same install, same security model, same `~/nello-claw/` output. See [INSTALL_GUIDE.md](INSTALL_GUIDE.md) for what gets installed and what does not.
 
@@ -24,7 +24,7 @@ Notes — pick a structure (NELLO / PARA / Zettelkasten / Custom) and where to p
 
 How they sound — em dash policy, banned words, voice rules.
 
-Connections — paste API keys for the services you want (Telegram, Groq for voice, Google Workspace, optional research keys).
+Connections — the keys your assistant asks for: a Telegram bot token, your Composio key (one key connects Gmail, Calendar, Drive, Slack, Notion, CRMs), and Exa for research. Groq is optional for voice.
 
 Last bits — auto-start on login, daily morning brief, etc.
 

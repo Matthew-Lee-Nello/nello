@@ -18,7 +18,7 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 
 ## 2. Env keys (mask values)
 - Read `.env`. List every `KEY=` line.
-- Report `SET` / `MISSING` / `EMPTY` for: `TELEGRAM_BOT_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `ALLOWED_CHAT_IDS`, `VAULT_PATH`
+- Report `SET` / `MISSING` / `EMPTY` for: `TELEGRAM_BOT_TOKEN`, `ALLOWED_CHAT_ID`, `COMPOSIO_API_KEY`, `COMPOSIO_MCP_URL`, `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `VAULT_PATH`
 - Never print actual key values.
 
 ## 3. Services (Mac launchd / Win schtasks / Linux systemd)
@@ -39,7 +39,7 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 
 ## 6. CLI tools wired
 - `which claude && claude --version`
-- `which uv && uv --version` (Google Workspace MCP needs this)
+- `which uv && uv --version` (used by some MCP servers)
 - `which obsidian-cli && obsidian-cli --version`
 - `ls -la /Applications/Obsidian.app` (Mac) or `%LOCALAPPDATA%\Obsidian\Obsidian.exe` (Win)
 - `ls -la ~/Applications/nello-claw.app` (Mac shortcut)
@@ -79,7 +79,7 @@ Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full r
 ## 12. Telegram bot test
 - Read `TELEGRAM_BOT_TOKEN` from `.env`
 - `curl -s "https://api.telegram.org/bot<TOKEN>/getMe"` - confirm bot is alive
-- `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"` - confirm at least one message has been sent (so `chat_id` got captured into `ALLOWED_CHAT_IDS`)
+- `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"` - confirm at least one message has been sent (so `chat_id` got captured into `ALLOWED_CHAT_ID`)
 
 ## 13. Permissions / friction
 - Mac: any pending sudo prompts (`sudo -n true`)
@@ -127,8 +127,8 @@ NEXT 3 THINGS TO FIX (priority order):
 | Health endpoint times out | Daemon crashed. `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` and recheck `store/server.log` |
 | `(no response)` from chat | Claude Code auth missing. Run `claude` once in terminal to log in. Restart daemon. |
 | Telegram returns 401 | Bot token invalid. Regenerate via `@BotFather` and update `.env` |
-| Google MCP fails | `uv` not installed. Run `brew install uv` (Mac) or `winget install astral-sh.uv` (Win) |
-| Vault doesn't open in Obsidian | `Obsidian.app` not installed. `brew install --cask obsidian` |
+| Apps won't connect (Composio) | Check `COMPOSIO_API_KEY` + `COMPOSIO_MCP_URL` in `.env`, then re-run `scripts/sync-env-to-configs.sh` |
+| Vault doesn't open in Obsidian | Obsidian not installed. Get it from obsidian.md/download |
 | Permission prompts won't go away | Mac TCC blocked the daemon. System Settings → Privacy & Security → grant access to `node` |
 
 ## After the report

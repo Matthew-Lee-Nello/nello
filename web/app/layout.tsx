@@ -20,7 +20,7 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: 'NELLO Labs - Your AI Chief Operations Officer',
-  description: 'An AI Chief Operations Officer who knows everything about you, runs on your Mac, and just does the work. Setup takes 10 minutes. Your keys stay on your machine. Built on the nello-claw workspace.',
+  description: 'An AI Chief Operations Officer who knows everything about you, runs on your Mac, and just does the work. Setup takes 15 minutes. Your keys stay on your machine. Built on the nello-claw workspace.',
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',

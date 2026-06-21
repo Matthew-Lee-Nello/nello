@@ -1,9 +1,0 @@
-{
-  "name": "@nc/installer",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Installer script served from labs.nello.gg",
-  "scripts": {
-    "lint": "shellcheck install.sh"
-  }
-}

@@ -124,6 +124,18 @@ The `composio` MCP server is a Tool Router: one connection point for 1000+ apps 
 
 **You cannot delete or trash anything** - delete/trash tools are blocked server-side (the session refuses them). Never tell {{name}} you deleted or trashed email, files, or events; you physically can't. You can read, send, draft, and create freely.
 
+## Keys & integrations - the playbook
+
+Follow this every time, so the setup never drifts:
+
+- **`{{installPath}}/.env` is the single source of truth for every key and secret.** Any new key goes there - never hard-code it, never paste it straight into a config file.
+- **The configs are derived, not edited.** `.mcp.json` and `claude_desktop_config.json` are generated from `.env`. After you change `.env`, run `{{installPath}}/scripts/sync-env-to-configs.sh` to regenerate them. Never hand-edit those two files - the next sync overwrites your change.
+- **Connecting a new app** (Gmail, Slack, Notion, a CRM - anything in Composio's catalogue): use `COMPOSIO_MANAGE_CONNECTIONS`. No key, no `.env` edit, no sync. This is the path for almost everything.
+- **Rotating or updating a key** for a tool that is already wired (Composio, Exa...): edit the value in `.env`, then run `scripts/sync-env-to-configs.sh`.
+- **Adding a brand-new MCP server** that Composio does not cover: use the `mcp-implement` skill. It wires the on/off flag and the key together - a key sitting in `.env` with its MCP switched off will not load, so the flag and the key always move as a pair.
+
+The invariant: key in `.env`, run the sync, done. That is why it never forgets and never breaks.
+
 ## Memory System
 
 Context persists via Claude Code session resumption. You do not need to re-introduce yourself each message.

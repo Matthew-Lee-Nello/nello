@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * nello-claw bootstrap - renders the wizard bundle into a live installation.
+ * nello-claw bootstrap - renders the install bundle into a live installation.
  *
- * Input: ./bundle.json (or NC_BUNDLE env path) - wizard answers JSON
+ * Input: ./bundle.json (or NC_BUNDLE env path) - install-interview answers JSON, assembled locally
  * Output: personalised files written into the install dir (CWD)
  *
  * Steps:
@@ -189,6 +189,23 @@ function writeEnv(bundle) {
   const envPath = join(INSTALL_PATH, '.env')
   writeFileSync(envPath, lines.join('\n'))
   try { chmodSync(envPath, 0o600) } catch {}
+}
+
+// Parse an existing .env into a plain object, stripping the surrounding quotes
+// writeEnv adds to values that contain a space or '#'. Used to overlay the live
+// .env onto bundle.keys so .env is the source of truth on any re-run (and the
+// `--configs-only` fast sync). Missing/unreadable file → {}.
+function readEnvOverlay(envPath) {
+  const out = {}
+  try {
+    if (!existsSync(envPath)) return out
+    for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+      const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+      if (!m) continue
+      out[m[1]] = m[2].replace(/\r$/, '').replace(/^["']|["']$/g, '')
+    }
+  } catch {}
+  return out
 }
 
 // Every server name a given renderer can emit (all baseline flags on). Derived
@@ -509,80 +526,26 @@ function installUv() {
 let _obsidianInstalled = false
 
 function installObsidianApp() {
-  // Cross-platform Obsidian install with real fallbacks. Idempotent - skips if
-  // already installed. Runs from bootstrap so EVERY entry path gets Obsidian
-  // (bash one-liner, PowerShell, Claude Code paste-in, manual git clone all
-  // hit this same code).
+  // Obsidian is a NAMED manual prerequisite now (the site tells the owner to grab
+  // it alongside VS Code). We no longer download it here — the old brew/dmg/winget/
+  // PowerShell-asset paths were the flakiest part of the whole install. Just detect
+  // whether it's present so the end-of-install summary and the auto-open-vault step
+  // (gated on _obsidianInstalled) behave correctly; warn with the link if missing.
+  // The vault works as plain markdown either way.
   const platform = process.platform
+  const winCandidates = [
+    join(process.env.LOCALAPPDATA || '', 'Obsidian', 'Obsidian.exe'),
+    join(process.env.LOCALAPPDATA || '', 'Programs', 'Obsidian', 'Obsidian.exe'),
+    'C:\\Program Files\\Obsidian\\Obsidian.exe',
+    'C:\\Program Files (x86)\\Obsidian\\Obsidian.exe',
+  ]
+  let present = false
+  if (platform === 'darwin') present = existsSync('/Applications/Obsidian.app')
+  else if (platform === 'win32') present = winCandidates.some(p => existsSync(p))
+  else { try { present = !!execSync('command -v obsidian', { stdio: 'pipe' }).toString().trim() } catch {} }
 
-  if (platform === 'darwin') {
-    if (existsSync('/Applications/Obsidian.app')) { ok('Obsidian.app already installed'); _obsidianInstalled = true; return }
-    // Try Homebrew first
-    try {
-      execSync('which brew', { stdio: 'pipe' })
-      execSync('brew install --cask obsidian', { stdio: 'pipe' })
-      if (existsSync('/Applications/Obsidian.app')) { ok('Obsidian.app installed via Homebrew'); _obsidianInstalled = true; return }
-    } catch {}
-    // Fallback - download .dmg directly + open it. User drag-drops to Applications.
-    // Better than nothing: at least the user sees Obsidian in their face.
-    try {
-      const dmg = join(process.env.TMPDIR || '/tmp', 'Obsidian.dmg')
-      execSync(`curl -fsSL -o "${dmg}" https://github.com/obsidianmd/obsidian-releases/releases/latest/download/Obsidian-universal.dmg`, { stdio: 'pipe' })
-      execSync(`open "${dmg}"`, { stdio: 'pipe' })
-      warn('Obsidian.dmg opened - drag the app icon to Applications, then close the disk image. Vault still works as plain markdown if you skip.')
-    } catch {
-      warn('Obsidian install skipped - get it from https://obsidian.md/download (vault still works as plain markdown)')
-    }
-  } else if (platform === 'win32') {
-    const exeCandidates = [
-      join(process.env.LOCALAPPDATA || '', 'Obsidian', 'Obsidian.exe'),
-      join(process.env.LOCALAPPDATA || '', 'Programs', 'Obsidian', 'Obsidian.exe'),
-      'C:\\Program Files\\Obsidian\\Obsidian.exe',
-      'C:\\Program Files (x86)\\Obsidian\\Obsidian.exe',
-    ]
-    if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian already installed'); _obsidianInstalled = true; return }
-    // Try winget first
-    try {
-      execSync('winget install --silent --accept-source-agreements --accept-package-agreements Obsidian.Obsidian', { stdio: 'pipe' })
-      if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via winget'); _obsidianInstalled = true; return }
-    } catch {}
-    // Fallback - resolve latest installer asset via GitHub Releases API then download.
-    // Earlier versions of this script hit a hardcoded URL that 404'd because Obsidian
-    // ships versioned filenames (e.g. Obsidian-1.5.12.exe), not a stable Obsidian.exe.
-    try {
-      const installer = join(process.env.TEMP || process.env.LOCALAPPDATA || '.', 'Obsidian-installer.exe')
-      // Escape PowerShell single-quote literal for paths that may contain `'`
-      // (e.g. `C:\Users\O'Brien\AppData\Local\Temp`). Without this the single-
-      // quoted PS string breaks and the user gets a confusing parser error or,
-      // worse, runs arbitrary follow-on text as a command.
-      const installerPsLit = installer.replace(/'/g, "''")
-      info('Resolving latest Obsidian installer (winget unavailable)...')
-      const ps = [
-        "$ErrorActionPreference='Stop'",
-        "$rel = Invoke-RestMethod 'https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest'",
-        "$asset = $rel.assets | Where-Object { $_.name -match '^Obsidian-\\d+\\.\\d+\\.\\d+\\.exe$' } | Select-Object -First 1",
-        "if (-not $asset) { throw 'no matching installer in latest release' }",
-        `Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '${installerPsLit}'`,
-      ].join('; ')
-      // spawnSync with argv avoids the cmd.exe quoting layer entirely — safer than
-      // execSync(`powershell -Command "${ps}"`) when ps contains nested quotes.
-      const psRes = spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'pipe' })
-      if (psRes.status !== 0) {
-        throw new Error(psRes.stderr?.toString().split('\n')[0] || 'powershell download failed')
-      }
-      const runRes = spawnSync(installer, ['/S'], { stdio: 'pipe' })  // /S = silent install
-      if (runRes.status !== 0) {
-        throw new Error(runRes.stderr?.toString().split('\n')[0] || 'installer exit non-zero')
-      }
-      if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via direct download'); _obsidianInstalled = true; return }
-      warn('Obsidian installer ran but app not found at expected path. Open https://obsidian.md/download and install manually.')
-    } catch (err) {
-      const reason = err?.stderr?.toString().split('\n')[0] || err?.message?.split('\n')[0] || 'unknown'
-      warn(`Obsidian install skipped (${reason}) - get it from https://obsidian.md/download (vault still works as plain markdown)`)
-    }
-  } else {
-    warn('Linux: install Obsidian manually from https://obsidian.md/download (vault still works as plain markdown)')
-  }
+  if (present) { ok('Obsidian found'); _obsidianInstalled = true }
+  else warn('Obsidian not found - install it from https://obsidian.md/download (the vault still works as plain markdown without it)')
 }
 
 function seedMorningBrief(bundle) {
@@ -673,12 +636,11 @@ function detectStaleInstalls() {
   if (process.platform === 'linux') warn(`  systemctl --user disable --now ${LAUNCHAGENT_LABEL}; rm ~/.config/systemd/user/${LAUNCHAGENT_LABEL}.service`)
 }
 
-// Hand-rolled bundle schema check. Hosted wizard already produces well-shaped
-// bundles, but bundle.json is the trust boundary between the wizard host and
-// the customer machine — anything that lands in ~/Downloads can be replaced
-// or tampered with before install. Reject unknown top-level keys and bad
-// types so a hostile bundle can't smuggle extra data into context that later
-// drives file writes or process spawning.
+// Hand-rolled bundle schema check. The assistant assembles bundle.json locally
+// from the install interview, but it's still the trust boundary into bootstrap:
+// a hand-edited or tampered bundle must not smuggle extra data into context that
+// later drives file writes or process spawning. Reject unknown top-level keys and
+// bad types.
 const BUNDLE_KNOWN_KEYS = new Set([
   'name', 'assistantName', 'occupation', 'location', 'timezone', 'bio', 'age',
   'projects', 'teamMembers', 'clients', 'mentors', 'tools',
@@ -703,7 +665,7 @@ function validateBundle(bundle) {
   }
   for (const key of Object.keys(bundle)) {
     if (!BUNDLE_KNOWN_KEYS.has(key)) {
-      fail(`bundle.json contains unknown key: ${JSON.stringify(key)}. Refusing to proceed — re-download a fresh bundle from labs.nello.gg.`)
+      fail(`bundle.json contains unknown key: ${JSON.stringify(key)}. Refusing to proceed. Re-assemble bundle.json from the install interview (INSTALL_GUIDE.md Step 5).`)
       process.exit(1)
     }
   }
@@ -753,10 +715,22 @@ async function main() {
     process.exit(1)
   }
 
-  detectStaleInstalls()
+  const CONFIGS_ONLY = process.argv.includes('--configs-only')
+
+  if (!CONFIGS_ONLY) detectStaleInstalls()
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
   validateBundle(bundle)
+
+  // .env is the single source of truth for secrets once an install exists.
+  // Overlay it onto bundle.keys (env wins) so a re-run — and especially the
+  // `--configs-only` sync after the owner edits .env — regenerates configs from
+  // the live .env, not the frozen bundle.json. This also makes the Composio
+  // auto-provision below skip when COMPOSIO_MCP_URL already lives in .env (the
+  // minted URL is written to .env but never back to bundle.json), so there's no
+  // accidental re-mint. First install: .env doesn't exist yet → overlay empty →
+  // output unchanged.
+  bundle.keys = { ...(bundle.keys || {}), ...readEnvOverlay(join(INSTALL_PATH, '.env')) }
 
   // Composio: the only value collected is the API key. Mint this install's durable
   // Tool Router URL from it automatically (destructiveHint disabled = no delete/trash),
@@ -780,6 +754,20 @@ async function main() {
 
   const ctx = buildContext(bundle)
   validateVaultPath(ctx.vaultPath)
+
+  // --configs-only: the `sync-env-to-configs.sh` fast path. Regenerate JUST
+  // .mcp.json + claude_desktop_config.json from the live .env (already overlaid
+  // onto bundle.keys above), then stop — no persona re-render, no vault reseed,
+  // no plugin/skill/service/Obsidian work, no audit, no dashboard poll. Byte-
+  // identical to the full path's config write (same renderers + managed sets),
+  // and writeMergedMcpConfig preserves client-added (unmanaged) MCP servers.
+  if (CONFIGS_ONLY) {
+    info('Syncing MCP configs from .env')
+    writeMergedMcpConfig(join(INSTALL_PATH, '.mcp.json'), renderMcpJson(ctx), managedMcpKeys(renderMcpJson))
+    writeMergedMcpConfig(join(INSTALL_PATH, 'claude_desktop_config.json'), renderClaudeDesktopConfig(ctx), managedMcpKeys(renderClaudeDesktopConfig))
+    ok('.mcp.json + claude_desktop_config.json synced from .env')
+    return
+  }
 
   // Upfront summary so user (and Claude in plan mode) sees every change before any of them happen.
   console.log(`${ACCENT}This bootstrap will make these changes:${RESET}`)

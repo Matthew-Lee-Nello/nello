@@ -14,8 +14,8 @@ const lastCommitISO = (() => {
   }
 })()
 
-// Conservative default CSP. The wizard collects API keys + stores them in
-// localStorage during the session, so any XSS bug on this site is high-stakes.
+// Conservative default CSP. This site is static marketing + an install-prompt
+// copy button; it never handles API keys. CSP stays locked down as defence-in-depth.
 // `'unsafe-inline'` on style-src is required by Next's inline injected styles;
 // every other directive is locked down. Adjust the connect-src list if/when a
 // real /api endpoint needs an upstream call.

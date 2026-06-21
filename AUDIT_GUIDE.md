@@ -10,7 +10,7 @@ If you got here from labs.nello.gg/audit, the prompt you pasted into Claude Code
 
 People who already have Claude Code and some setup in place — for example, the Google Workspace MCP wired up, or a vault folder, or a few skills installed — but want to add the rest of the nello-claw stack piece by piece.
 
-If you have nothing in place yet, use the wizard at labs.nello.gg instead.
+If you have nothing in place yet, go to labs.nello.gg and follow the standard install instead.
 
 ## What the audit looks at
 
