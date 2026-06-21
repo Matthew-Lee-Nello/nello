@@ -91,6 +91,9 @@ importers:
       '@whiskeysockets/baileys':
         specifier: ^6.7.9
         version: 6.17.16(eslint@9.39.4(jiti@2.7.0))(qrcode-terminal@0.12.0)(typescript@5.9.3)
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       qrcode-terminal:
         specifier: ^0.12.0
         version: 0.12.0
@@ -101,9 +104,6 @@ importers:
       '@types/qrcode-terminal':
         specifier: ^0.12.2
         version: 0.12.2
-      qrcode:
-        specifier: ^1.5.4
-        version: 1.5.4
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
