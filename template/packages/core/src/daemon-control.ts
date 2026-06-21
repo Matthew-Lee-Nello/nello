@@ -8,7 +8,7 @@
  */
 
 import { logger } from './logger.js'
-import { TELEGRAM_BOT_TOKEN, ALLOWED_CHAT_IDS } from './config.js'
+import { TELEGRAM_BOT_TOKEN, ALLOWED_CHAT_IDS, WHATSAPP_OWNER_NUMBER } from './config.js'
 
 // Structural type so we don't drag grammy into @nc/core.
 // The real bot instance is passed in by template/src/index.ts.
@@ -64,5 +64,53 @@ export function getTelegramState() {
     paused: tg.paused,
     lastError: tg.lastError,
     username: tg.username,
+  }
+}
+
+// ----- WhatsApp (Baileys) -----
+// Structural type so we don't drag baileys into @nc/core. The real bot (with its
+// own internal reconnect) is passed in by template/src/index.ts.
+interface WaLike {
+  stop(): Promise<void>
+}
+
+interface WhatsAppRuntime {
+  bot: WaLike | null
+  running: boolean
+  paused: boolean
+  lastError: string | null
+}
+
+const wa: WhatsAppRuntime = { bot: null, running: false, paused: false, lastError: null }
+
+export function registerWhatsAppBot(bot: WaLike): void { wa.bot = bot }
+export function setWhatsAppRunning(running: boolean): void { wa.running = running }
+export function setWhatsAppError(err: string | null): void { wa.lastError = err }
+export function isWhatsAppPaused(): boolean { return wa.paused }
+
+export async function pauseWhatsApp(): Promise<void> {
+  wa.paused = true
+  if (wa.bot && wa.running) {
+    try {
+      await wa.bot.stop()
+      logger.info('[daemon-control] WhatsApp bot stopped via pause request')
+    } catch (err) {
+      logger.warn({ err }, '[daemon-control] WhatsApp stop failed')
+    }
+  }
+}
+
+export function resumeWhatsApp(): void {
+  wa.paused = false
+  wa.lastError = null
+  logger.info('[daemon-control] WhatsApp resume requested')
+}
+
+export function getWhatsAppState() {
+  return {
+    configured: !!WHATSAPP_OWNER_NUMBER,
+    running: wa.running,
+    paused: wa.paused,
+    lastError: wa.lastError,
   }
 }

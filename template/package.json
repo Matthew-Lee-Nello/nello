@@ -18,6 +18,7 @@
   "dependencies": {
     "@nc/audit": "workspace:*",
     "@nc/bot-telegram": "workspace:*",
+    "@nc/bot-whatsapp": "workspace:*",
     "@nc/core": "workspace:*",
     "@nc/dashboard": "workspace:*",
     "@nc/scheduler": "workspace:*",

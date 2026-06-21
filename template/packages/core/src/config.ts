@@ -19,6 +19,17 @@ export const ALLOWED_CHAT_IDS = (env['ALLOWED_CHAT_ID'] ?? '')
   .map(id => id.trim())
   .filter(id => id.length > 0)
 
+// WhatsApp (optional inbound surface via Baileys - the unofficial WhatsApp Web
+// protocol, a local QR-linked device). Owner-locked to one number; the auth/
+// session state persists under WHATSAPP_SESSION_DIR. Empty number = WhatsApp off.
+export const WHATSAPP_OWNER_NUMBER = (env['WHATSAPP_OWNER_NUMBER'] ?? '').replace(/[^0-9]/g, '')
+export const WHATSAPP_SESSION_DIR = env['WHATSAPP_SESSION_DIR'] || join(PROJECT_ROOT, '.wa-session')
+
+// Pick-one messaging surface chosen at install: 'telegram' or 'whatsapp'. The
+// daemon reads this to start exactly one bot and to refuse Telegram discovery on a
+// WhatsApp install even if a stale token lingers in .env. Empty/legacy = telegram.
+export const MESSAGING_CHANNEL = (env['MESSAGING_CHANNEL'] ?? '').trim().toLowerCase()
+
 // Voice
 export const GROQ_API_KEY = env['GROQ_API_KEY'] ?? ''
 

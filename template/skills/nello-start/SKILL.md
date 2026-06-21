@@ -140,6 +140,7 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
   │                                                          │
   │   /nello-start    this welcome tour                      │
   │   /nello-build    wire your first features (next step)   │
+  │   /build-brain    seed your brain from ChatGPT + tools   │
   │   /research       live web research with Exa             │
   │   /install-doctor sanity check what's running            │
   │   /find-skill     find + vet + install any new skill     │
@@ -157,6 +158,8 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
 1. In **Claude Code** (the terminal app), just type `/` and the menu opens. Pick one, hit enter, it runs.
 2. In the **dashboard chat** at `localhost:3000`, same thing - type `/`, the autocomplete shows up.
 3. **If a slash command doesn't show up**, start a new chat. Claude Code reloads its skills list per session. If it still doesn't show, just ask Claude to run it by name ("run nello-build").
+
+**Switching how I text you:** say **`/connect-whatsapp`** to link (or move to) WhatsApp - a QR pops up right in the chat, you scan it, done - or **`/connect-telegram`** to go the Telegram way.
 
 **You can write your own slash commands too.** That's what `/write-skill` is for. We'll do that together at the end of `/nello-build`.
 

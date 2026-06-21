@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Typewriter } from '@/components/ui/typewriter'
 import { ClaudeBuddy } from '@/components/ui/claude-buddy'
@@ -140,6 +141,14 @@ export default function HeroAscii() {
                   I HAVE CLAUDE CODE
                 </button>
               </div>
+
+              <Link
+                href="/update"
+                className="mt-4 inline-flex items-center gap-1.5 text-xs lg:text-sm font-mono tracking-[0.12em] text-[var(--accent)] opacity-90 hover:opacity-100 transition-colors"
+                style={{ letterSpacing: '0.12em' }}
+              >
+                ALREADY INSTALLED? UPDATE IT ↗
+              </Link>
 
               <div className="hidden lg:flex items-center gap-2 mt-8 opacity-50">
                 <span className="text-[var(--ink)] text-[9px] font-mono">∞</span>

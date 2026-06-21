@@ -147,6 +147,12 @@ Whenever the assistant writes to your vault, it uses a prefix so things stay fin
 
 If you ever want to see what's in there, **Obsidian.app is already installed and pre-configured** - open it from your `/Applications` folder, the vault loads automatically. Use it as a viewer; the assistant does the writing.
 
+**2.4. Seed your brain from everything you already have (optional, powerful).**
+
+You don't have to build the brain one note at a time. If you've used ChatGPT, export your history (chatgpt.com -> Settings -> Data controls -> Export data), then say **`/build-brain`** and point me at the download - the zip, a folder, or just "it's in my Downloads". I fold all of it into your brain.
+
+It reads that export and does a full backfill across every tool you've connected (Gmail, Calendar, Drive, Notion, your CRM), archives all of it as searchable notes, and pulls the people, clients, projects and frameworks into your vault with wikilinks. It's resumable, so you can run it again any time and it only files what's new. Your whole history becomes the brain in one pass.
+
 `[x] 2. Dashboard + Obsidian as second brain`
 
 ### Section 3 - MCPs in Telegram (real use cases)
@@ -290,6 +296,8 @@ Watch it when you're ready to scale past your inbox into the whole business.
 DM `mattlee.nello` on Instagram if you hit a wall.
 
 That's it. You've got an AI COO running on your machine, five workflows wired, your first custom skill scheduled, and a path to the company brain when you're ready.
+
+One more for later: when there's a new version, just say **`/update`** and I'll pull the newest nello-claw onto your machine - your vault, memory and settings stay exactly as they are.
 
 Welcome in.
 

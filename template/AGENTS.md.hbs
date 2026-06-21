@@ -17,6 +17,7 @@ The SessionStart hook at `scripts/inject-brain-context.sh` cats 4-7 into every s
 ## Response Protocol
 
 - Apply the voice rules from `CLAUDE.md` as you write, not as a post-hoc pass
+- Talking to {{name}} (not a developer): say the real technical term, then explain it in one plain sentence a smart 12-year-old would get. Real word first, plain meaning second, anchored to something they already use. Don't strip the jargon out, teach it; one term per thing, no synonym-swapping. {{name}} may say "dev mode" to suspend this. (See CLAUDE.md "How you talk to {{name}}".)
 - For any code change: run `karpathy-guidelines` checks first if enabled
 - For any vault write: follow the `{{vaultPreset}}` taxonomy
 - For any memory write: update `MEMORY.md` index too

@@ -136,6 +136,21 @@ function buildContext(bundle) {
 function writeEnv(bundle) {
   const keys = { ...(bundle.keys || {}) }
 
+  // Pick-one messaging channel chosen at setup (Telegram OR WhatsApp). Drives which
+  // owner-lock applies and which bot the daemon starts. Precedence: the live .env
+  // value wins (so a post-install /connect-* switch survives a full re-run - keys
+  // carries the .env overlay here), then the explicit bundle field, then inference
+  // from whichever channel's key is present, else telegram. Persisted to .env so the
+  // daemon (config.ts) can refuse the wrong bot even if a stale key lingers.
+  const envChannel = String(keys.MESSAGING_CHANNEL || '').trim().toLowerCase()
+  const channel = (envChannel === 'telegram' || envChannel === 'whatsapp')
+    ? envChannel
+    : (bundle.messagingChannel
+        || (keys.TELEGRAM_BOT_TOKEN ? 'telegram'
+            : keys.WHATSAPP_OWNER_NUMBER ? 'whatsapp'
+            : 'telegram'))
+  keys.MESSAGING_CHANNEL = channel
+
   // Telegram owner lock. The wizard can supply the owner chat ID either as a
   // top-level `telegramChatId` field (PR-7.1) or inside keys.ALLOWED_CHAT_ID
   // (existing wizard path). The explicit field wins. Writing this into .env is
@@ -145,15 +160,23 @@ function writeEnv(bundle) {
   const ownerChatId = String(bundle.telegramChatId ?? keys.ALLOWED_CHAT_ID ?? '').trim()
   if (ownerChatId) keys.ALLOWED_CHAT_ID = ownerChatId
 
-  // Fail closed on an unlocked bot. If a Telegram token ships but no owner chat
-  // ID, discovery.ts does first-message-wins pairing and hands ownership of a
-  // bypassPermissions assistant to whoever messages the bot first. install.sh
-  // asserts this after the fact, but the conversational install runs bootstrap
-  // directly (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard the
-  // invariant here, where every entry path passes through.
-  if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
-    fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
-    process.exit(1)
+  if (channel === 'whatsapp') {
+    // WhatsApp-only install: Telegram must be fully absent so the daemon can't
+    // enter Telegram discovery (index.ts) and .env carries no empty Telegram noise.
+    // The owner number is captured after install by /connect-whatsapp (QR link).
+    delete keys.TELEGRAM_BOT_TOKEN
+    delete keys.ALLOWED_CHAT_ID
+  } else {
+    // Telegram install: fail closed on an unlocked bot. If a Telegram token ships
+    // but no owner chat ID, discovery.ts does first-message-wins pairing and hands
+    // ownership of a bypassPermissions assistant to whoever messages the bot first.
+    // install.sh asserts this after the fact, but the conversational install runs
+    // bootstrap directly (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard
+    // the invariant here, where every entry path passes through.
+    if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
+      fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
+      process.exit(1)
+    }
   }
 
   // Dashboard auth token (v1 security blocker). The dashboard + its chat route
@@ -208,13 +231,35 @@ function readEnvOverlay(envPath) {
   return out
 }
 
+// Stamp the install with the code version it was built from, so /install-doctor
+// and the assistant can tell when a client is behind origin/main and prompt an
+// update. Best-effort: missing git or a detached repo just skips it, never fatal.
+function writeVersionStamp(installPath) {
+  try {
+    const opts = { cwd: TEMPLATE_DIR, stdio: ['ignore', 'pipe', 'ignore'] }
+    const commit = execSync('git rev-parse --short HEAD', opts).toString().trim()
+    const date = execSync('git log -1 --format=%cI', opts).toString().trim()
+    const stamp = { commit, date, stampedAt: new Date().toISOString() }
+    writeFileSync(join(installPath, '.nello-version'), JSON.stringify(stamp, null, 2) + '\n')
+  } catch {}
+}
+
 // Every server name a given renderer can emit (all baseline flags on). Derived
 // from the renderer itself, not hardcoded, so the managed set can never drift
 // from render-configs.js. .mcp.json and claude_desktop_config.json have
 // different baseline sets, so each call passes its own renderer's set.
+// Servers nello-claw shipped before the Composio migration. The current renderer
+// never emits these, so without listing them here an old install's stale
+// google_workspace / workspace-mcp entry would be treated as client-added and
+// preserved on re-sync - and keep prompting for Google OAuth after an update.
+// Listing them as "managed" makes a re-run (or `--configs-only`) prune them.
+// Kept tight to the names nello-claw itself shipped, so a client's own MCPs are
+// never touched.
+const DEPRECATED_MCP_KEYS = ['google_workspace', 'workspace-mcp']
+
 function managedMcpKeys(renderFn) {
   const allOn = { mcps: { composio: true, obsidian: true, exa: true, apify: true, tavily: true, firecrawl: true }, env: {}, vaultPath: '' }
-  return new Set(Object.keys(renderFn(allOn).mcpServers || {}))
+  return new Set([...Object.keys(renderFn(allOn).mcpServers || {}), ...DEPRECATED_MCP_KEYS])
 }
 
 // Write the rendered MCP config, preserving servers a client added post-install
@@ -657,6 +702,8 @@ const BUNDLE_KNOWN_KEYS = new Set([
   'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
   'enableAutoFetch', 'autoFetchCron',
   'telegramChatId',
+  // Pick-one messaging channel chosen at install: "telegram" or "whatsapp".
+  'messagingChannel',
 ])
 function validateBundle(bundle) {
   if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) {
@@ -682,6 +729,12 @@ function validateBundle(bundle) {
   }
   if (bundle.keys !== undefined && (typeof bundle.keys !== 'object' || Array.isArray(bundle.keys))) {
     fail('bundle.keys must be a plain object map')
+    process.exit(1)
+  }
+  if (bundle.messagingChannel !== undefined
+      && bundle.messagingChannel !== 'telegram'
+      && bundle.messagingChannel !== 'whatsapp') {
+    fail(`bundle.messagingChannel must be "telegram" or "whatsapp", got ${JSON.stringify(bundle.messagingChannel)}`)
     process.exit(1)
   }
 }
@@ -754,6 +807,10 @@ async function main() {
 
   const ctx = buildContext(bundle)
   validateVaultPath(ctx.vaultPath)
+
+  // Record the code version this install was built from (for /install-doctor + the
+  // update-staleness check). Both the full install and --configs-only restamp.
+  writeVersionStamp(INSTALL_PATH)
 
   // --configs-only: the `sync-env-to-configs.sh` fast path. Regenerate JUST
   // .mcp.json + claude_desktop_config.json from the live .env (already overlaid

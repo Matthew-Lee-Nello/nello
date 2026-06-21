@@ -7,10 +7,12 @@ import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   initDatabase, runDecaySweep, logger, PROJECT_ROOT, STORE_DIR,
-  TELEGRAM_BOT_TOKEN, ALLOWED_CHAT_IDS,
+  TELEGRAM_BOT_TOKEN, ALLOWED_CHAT_IDS, MESSAGING_CHANNEL,
   registerTelegramBot, setTelegramRunning, setTelegramError, isTelegramPaused,
+  WHATSAPP_OWNER_NUMBER, registerWhatsAppBot, setWhatsAppRunning, setWhatsAppError,
 } from '@nc/core'
 import { createBot, discoverChatId } from '@nc/bot-telegram'
+import { createWhatsAppBot } from '@nc/bot-whatsapp'
 import { initScheduler, stopScheduler } from '@nc/scheduler'
 import { startDashboard } from '@nc/dashboard/server'
 import * as voiceOnline from '@nc/voice-online'
@@ -58,8 +60,13 @@ async function main() {
   // Start dashboard
   const dashboard = startDashboard()
 
+  // Pick-one channel: only run Telegram when it's the chosen surface. A WhatsApp
+  // install (MESSAGING_CHANNEL=whatsapp) never enters Telegram discovery or start,
+  // even if a stale token were hand-pasted into .env. Legacy/empty = telegram.
+  const telegramSelected = MESSAGING_CHANNEL !== 'whatsapp'
+
   // Discovery mode: no chat ID yet → wait for first Telegram message, capture, restart.
-  if (TELEGRAM_BOT_TOKEN && ALLOWED_CHAT_IDS.length === 0) {
+  if (telegramSelected && TELEGRAM_BOT_TOKEN && ALLOWED_CHAT_IDS.length === 0) {
     logger.info('chat ID missing - entering discovery mode')
     const captured = await discoverChatId()
     if (captured !== null) {
@@ -75,7 +82,7 @@ async function main() {
   // call /api/daemons/telegram/{stop,start} to flip the paused flag and the
   // loop respects it without exiting the process.
   let bot: ReturnType<typeof createBot> | null = null
-  if (TELEGRAM_BOT_TOKEN && ALLOWED_CHAT_IDS.length > 0) {
+  if (telegramSelected && TELEGRAM_BOT_TOKEN && ALLOWED_CHAT_IDS.length > 0) {
     bot = createBot({
       transcribeAudio: voiceOnline.transcribeAudio,
       // TTS not wired in online mode. Install @nc/voice-local for Piper TTS.
@@ -129,8 +136,30 @@ async function main() {
         }
       }
     })().catch(err => logger.error({ err }, 'Telegram restart loop crashed'))
+  } else if (!telegramSelected) {
+    logger.info('messaging channel = whatsapp; Telegram disabled')
   } else if (!TELEGRAM_BOT_TOKEN) {
     logger.warn('TELEGRAM_BOT_TOKEN missing - bot disabled, dashboard only')
+  }
+
+  // WhatsApp (the other pick-one surface, via Baileys). Enabled when the owner
+  // number is set. The number is captured by /connect-whatsapp (QR link); until
+  // then a WhatsApp install runs dashboard-only. The bot reconnects on its own,
+  // so no polling loop is needed here.
+  // Symmetric to telegramSelected: a 'telegram' install never starts WhatsApp even if
+  // a number lingers in .env, so exactly one bot runs by construction (not by .env
+  // hygiene). Legacy/empty channel keeps the old opt-in-by-number behaviour.
+  const whatsappSelected = MESSAGING_CHANNEL !== 'telegram'
+  let waBot: ReturnType<typeof createWhatsAppBot> | null = null
+  if (whatsappSelected && WHATSAPP_OWNER_NUMBER) {
+    waBot = createWhatsAppBot()
+    registerWhatsAppBot(waBot)
+    logger.info({ owner: WHATSAPP_OWNER_NUMBER }, 'WhatsApp bot starting')
+    waBot.start()
+      .then(() => setWhatsAppRunning(true))
+      .catch(err => { setWhatsAppError(err?.message ?? String(err)); logger.error({ err }, 'WhatsApp bot failed to start') })
+  } else if (MESSAGING_CHANNEL === 'whatsapp') {
+    logger.warn('WhatsApp selected but WHATSAPP_OWNER_NUMBER empty - run /connect-whatsapp to link your phone')
   }
 
   // Shutdown
@@ -140,6 +169,7 @@ async function main() {
     stopScheduler()
     dashboard.close()
     if (bot) { await bot.stop(); setTelegramRunning(false) }
+    if (waBot) { await waBot.stop(); setWhatsAppRunning(false) }
     releaseLock()
     process.exit(0)
   }
