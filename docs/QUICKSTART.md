@@ -2,13 +2,12 @@
 
 ## For end users
 
-1. Go to **labs.nello.gg**
-2. Watch the 5-minute walkthrough video
-3. Complete the 7-screen Brain Method wizard
-4. Click **Build My Brain**
-5. Paste the one-liner into Terminal
-6. Wait ~5 minutes for install
-7. Send `/start` to your Telegram bot, or open http://localhost:3000
+1. Install VS Code, Claude Code and Obsidian (the only apps you set up by hand)
+2. Go to **labs.nello.gg**, watch the walkthrough, copy the install prompt
+3. Open an empty folder in VS Code and paste the prompt into Claude Code (Plan Mode)
+4. Answer the interview - identity, business, and a couple of keys (Composio, Telegram, Exa)
+5. Wait ~15 minutes while it builds
+6. Send a message to your Telegram bot, or open http://localhost:3000
 
 ## For contributors
 
@@ -73,12 +72,12 @@ cat > /tmp/test-bundle.json <<'EOF'
 }
 EOF
 
-# Run the installer against the test bundle into a temp dir
+# Run bootstrap against the test bundle into a temp dir
 NC_INSTALL_PATH=/tmp/nello-claw-test NC_BUNDLE=/tmp/test-bundle.json \
-  bash installer/install.sh /tmp/test-bundle.json
+  node template/bootstrap.js
 ```
 
 ## Deploying
 
 Web: `cd web && vercel --prod`
-Template: tag the repo. Installer pulls by `NC_TEMPLATE_REF` (default `main`).
+Template: tag the repo. The paste-prompt clones it; pin a tag for production installs.

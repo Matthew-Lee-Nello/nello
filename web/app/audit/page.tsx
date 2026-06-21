@@ -43,7 +43,7 @@ export default function AuditPage() {
       }}>
         <strong style={{ color: 'var(--accent)' }}>Step 1 - Install fresh</strong>
         <p style={{ margin: '8px 0 12px', fontSize: 14 }}>
-          Run the wizard. Pick a clean folder (anything that is not your old project). NelloClaw installs cleanly into it. No conflicts with your existing Claude Code setup, no overwrites.
+          Set up your assistant. Pick a clean folder (anything that is not your old project). NelloClaw installs cleanly into it. No conflicts with your existing Claude Code setup, no overwrites.
         </p>
         <Link href="/wizard"><button>Set up my assistant</button></Link>
       </div>
@@ -70,7 +70,7 @@ export default function AuditPage() {
 
       <h2 style={{ marginTop: 32, fontSize: 18 }}>Brand new to Claude Code?</h2>
       <p>
-        <Link href="/wizard">Skip this page. Just run the wizard →</Link>
+        <Link href="/wizard">Skip this page. Just set up your assistant →</Link>
       </p>
     </div>
   )

@@ -15,11 +15,14 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 - `ls -la ./`
 - Confirm these all exist: `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.env`, `.claude/settings.json`, `vault/`, `store/`, `dist/`, `node_modules/`, `template/skills/`
 - `stat -f "%p" .env` - must end in `600` for security (only the user can read keys)
+- **Version + updates:** `cat .nello-version` (the commit + date this install was built from). Then check drift: `git fetch origin main -q 2>/dev/null && git rev-list --count HEAD..origin/main 2>/dev/null`. If it returns 1 or more, report "behind by N - a newer nello-claw is out, run /update". If `.nello-version` is missing, the install predates version stamping (so it's behind - recommend /update). If the count is 0, report "up to date".
 
 ## 2. Env keys (mask values)
-- Read `.env`. List every `KEY=` line.
-- Report `SET` / `MISSING` / `EMPTY` for: `TELEGRAM_BOT_TOKEN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `ALLOWED_CHAT_IDS`, `VAULT_PATH`
-- Never print actual key values.
+- Read `.env`. List every `KEY=` line. Never print actual key values.
+- **Messaging channel:** read `MESSAGING_CHANNEL` (telegram / whatsapp; empty = legacy telegram). Report it - it decides which messaging checks apply below (§12).
+- Report `SET` / `MISSING` / `EMPTY` for: `COMPOSIO_API_KEY` (must start `ak_`), `COMPOSIO_MCP_URL` (the minted router URL - EMPTY means Composio provisioning failed at bootstrap), `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `VAULT_PATH`, `DASHBOARD_TOKEN`.
+- **`DASHBOARD_TOKEN` EMPTY = ✗** - the dashboard + its chat route run with bypassPermissions; an empty token is an open RCE surface. Must be SET.
+- **Pick-one integrity:** a `telegram` install should have `WHATSAPP_OWNER_NUMBER` empty (and a `whatsapp` install should have `TELEGRAM_BOT_TOKEN` empty). Both populated = ⚠ split-brain; the daemon runs only the chosen one, but clean up the stray.
 
 ## 3. Services (Mac launchd / Win schtasks / Linux systemd)
 - Mac: `launchctl list | grep nello-claw` - report PID + last exit code
@@ -39,7 +42,7 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 
 ## 6. CLI tools wired
 - `which claude && claude --version`
-- `which uv && uv --version` (Google Workspace MCP needs this)
+- `which uv && uv --version` (used by some MCP servers)
 - `which obsidian-cli && obsidian-cli --version`
 - `ls -la /Applications/Obsidian.app` (Mac) or `%LOCALAPPDATA%\Obsidian\Obsidian.exe` (Win)
 - `ls -la ~/Applications/nello-claw.app` (Mac shortcut)
@@ -60,10 +63,16 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 - `cat ~/.claude/settings.json` and warn if it contains `bypassPermissions: true`
 - Confirm `hooks` block has `SessionStart`, `UserPromptSubmit`, `PostToolUse` pointing at this install's paths
 
+## 9b. MCP config sanity
+- `cat .mcp.json` parses as JSON. Confirm the managed servers are present: `composio`, `obsidian`, `exa`.
+- **Stale Google OAuth servers:** grep for `google_workspace` / `workspace-mcp`. If present, the managed-key prune didn't run (pre-Composio leftover) - recommend `bash scripts/sync-env-to-configs.sh` (re-runs `bootstrap.js --configs-only`, which prunes them). On a current install these must be ABSENT.
+- Any client-added (unmanaged) MCP server should still be there - the prune must not have over-deleted.
+
 ## 10. Vault state
 - `ls vault/Memory/ vault/Journal/ vault/.obsidian/`
 - Confirm `Memory/MEMORY.md` exists
 - Confirm `.obsidian/appearance.json` has `"accentColor": "#FFA600"`
+- **Brain seeded?** Count taxonomy notes: `ls vault | grep -cE '^(Person|Client|Project)-'` (also check subfolders). Zero of all three on a real client = ⚠ "brain not seeded - run /build-brain (point me at a ChatGPT export) or seed from the interview".
 
 ## 11. Chat round-trip test
 
@@ -76,10 +85,17 @@ curl -sX POST "http://localhost:3000/api/chat/$CHAT/message" \
 ```
 Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full response. If `reply` is empty/null, the daemon is reachable but the agent is failing - usually Claude Code auth (see step 7).
 
-## 12. Telegram bot test
-- Read `TELEGRAM_BOT_TOKEN` from `.env`
-- `curl -s "https://api.telegram.org/bot<TOKEN>/getMe"` - confirm bot is alive
-- `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"` - confirm at least one message has been sent (so `chat_id` got captured into `ALLOWED_CHAT_IDS`)
+## 12. Messaging channel test (branch on MESSAGING_CHANNEL from §2)
+
+**If `telegram`:**
+- Read `TELEGRAM_BOT_TOKEN`. `curl -s "https://api.telegram.org/bot<TOKEN>/getMe"` - confirm the bot is alive.
+- `ALLOWED_CHAT_ID` non-empty (the owner lock took). If empty, discovery hasn't completed - tell the user to message the bot.
+- `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"` - confirm at least one message exists (proves the phone link).
+
+**If `whatsapp`:**
+- `WHATSAPP_OWNER_NUMBER` SET (digits). If EMPTY → ⚠ "run /connect-whatsapp and scan the QR" (expected before linking, not a failure).
+- `ls .wa-session/creds.json` (or `$WHATSAPP_SESSION_DIR`) exists → the device is linked. Missing = QR not scanned yet.
+- `grep -c "whatsapp connected" store/server.log` ≥ 1, and no repeating `Connection Failure` → the socket is live.
 
 ## 13. Permissions / friction
 - Mac: any pending sudo prompts (`sudo -n true`)
@@ -92,12 +108,21 @@ Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full r
   - Windows: `Remove-Item -Recurse -Force "$HOME\nello-claw"`
   Stale installs cause the wrong scheduled task / LaunchAgent to fire on reboot.
 
+## 16. Brain backfill (informational)
+- Has `/build-brain` run? Look for `vault/Imports/` (archived ChatGPT/source history). If absent, note "optional - run /build-brain to fold a ChatGPT export + connected tools into the brain". Never ✗; purely informational.
+
+## 17. Branch / merge gate (only when run from the dev SOURCE repo, not a client install)
+- If this folder is the nello-claw source repo (has `web/`, a `.git` with the GitHub remote): `git rev-parse --abbrev-ref HEAD` and `git status --porcelain`.
+- If the WhatsApp / build-brain / channel-choice / update work sits on a feature branch (e.g. `feat/client-stack-v1`) and is NOT merged to `main`, flag ✗: **clients pulling `/update` track `origin/main` and won't receive any of it until the branch merges.** This is the John/Sunita update blocker - name it explicitly.
+- On a normal client install this section is N/A - skip silently.
+
 ## 15. Summary
 
 Print:
 ```
 INSTALL DOCTOR REPORT
 =====================
+Channel: telegram | whatsapp
 
 [1]  Install files        ✓ / ✗
 [2]  Env keys             ✓ / ⚠ / ✗
@@ -108,11 +133,14 @@ INSTALL DOCTOR REPORT
 [7]  Claude Code auth     ✓ / ✗
 [8]  Skills wired         ✓ / ✗
 [9]  Project settings     ✓ / ⚠ / ✗
+[9b] MCP config sane      ✓ / ⚠ / ✗
 [10] Vault state          ✓ / ⚠ / ✗
 [11] Chat round-trip      ✓ / ✗
-[12] Telegram bot         ✓ / ✗
+[12] Messaging channel    ✓ / ⚠ / ✗
 [13] Permissions          ✓ / ⚠
 [14] Stale install paths  ✓ / ⚠
+[16] Brain backfill       ✓ / ⚠ (info)
+[17] Branch/merge gate    ✓ / ✗ (dev repo only)
 
 NEXT 3 THINGS TO FIX (priority order):
 1. ...
@@ -127,8 +155,10 @@ NEXT 3 THINGS TO FIX (priority order):
 | Health endpoint times out | Daemon crashed. `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` and recheck `store/server.log` |
 | `(no response)` from chat | Claude Code auth missing. Run `claude` once in terminal to log in. Restart daemon. |
 | Telegram returns 401 | Bot token invalid. Regenerate via `@BotFather` and update `.env` |
-| Google MCP fails | `uv` not installed. Run `brew install uv` (Mac) or `winget install astral-sh.uv` (Win) |
-| Vault doesn't open in Obsidian | `Obsidian.app` not installed. `brew install --cask obsidian` |
+| WhatsApp not linked / `(no response)` | Run `/connect-whatsapp`, scan the QR. If it keeps refusing (`LINK_401`), WhatsApp is throttling - wait, then retry. |
+| WhatsApp answers its own messages | Old build without the echo guard. Rebuild (`pnpm -r build`) and restart the daemon. |
+| Apps won't connect (Composio) | Check `COMPOSIO_API_KEY` + `COMPOSIO_MCP_URL` in `.env`, then re-run `scripts/sync-env-to-configs.sh` |
+| Vault doesn't open in Obsidian | Obsidian not installed. Get it from obsidian.md/download |
 | Permission prompts won't go away | Mac TCC blocked the daemon. System Settings → Privacy & Security → grant access to `node` |
 
 ## After the report

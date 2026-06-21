@@ -19,13 +19,31 @@ export const ALLOWED_CHAT_IDS = (env['ALLOWED_CHAT_ID'] ?? '')
   .map(id => id.trim())
   .filter(id => id.length > 0)
 
+// WhatsApp (optional inbound surface via Baileys - the unofficial WhatsApp Web
+// protocol, a local QR-linked device). Owner-locked to one number; the auth/
+// session state persists under WHATSAPP_SESSION_DIR. Empty number = WhatsApp off.
+export const WHATSAPP_OWNER_NUMBER = (env['WHATSAPP_OWNER_NUMBER'] ?? '').replace(/[^0-9]/g, '')
+export const WHATSAPP_SESSION_DIR = env['WHATSAPP_SESSION_DIR'] || join(PROJECT_ROOT, '.wa-session')
+
+// Pick-one messaging surface chosen at install: 'telegram' or 'whatsapp'. The
+// daemon reads this to start exactly one bot and to refuse Telegram discovery on a
+// WhatsApp install even if a stale token lingers in .env. Empty/legacy = telegram.
+export const MESSAGING_CHANNEL = (env['MESSAGING_CHANNEL'] ?? '').trim().toLowerCase()
+
 // Voice
 export const GROQ_API_KEY = env['GROQ_API_KEY'] ?? ''
 
+// Composio Tool Router - the connection layer (Gmail, Calendar, Drive, Slack, Notion +
+// 1000 apps). COMPOSIO_MCP_URL is the per-client durable router URL minted by
+// scripts/composio-provision.py (destructiveHint disabled = no delete/trash). The agent
+// searches + runs any app's tools through it. COMPOSIO_API_KEY is the project key (the
+// only Composio secret on this machine).
+export const COMPOSIO_API_KEY = env['COMPOSIO_API_KEY'] ?? ''
+export const COMPOSIO_MCP_URL = env['COMPOSIO_MCP_URL'] ?? ''
+export const COMPOSIO_USER_ID = env['COMPOSIO_USER_ID'] ?? (env['GOOGLE_USER_EMAIL'] ?? '')
+
 // Optional integrations
 export const OPENAI_API_KEY = env['OPENAI_API_KEY'] ?? ''
-export const GOOGLE_OAUTH_CLIENT_ID = env['GOOGLE_OAUTH_CLIENT_ID'] ?? ''
-export const GOOGLE_OAUTH_CLIENT_SECRET = env['GOOGLE_OAUTH_CLIENT_SECRET'] ?? ''
 export const GOOGLE_USER_EMAIL = env['GOOGLE_USER_EMAIL'] ?? ''
 export const FIRECRAWL_API_KEY = env['FIRECRAWL_API_KEY'] ?? ''
 export const EXA_API_KEY = env['EXA_API_KEY'] ?? ''

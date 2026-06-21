@@ -9,13 +9,13 @@ export default function Docs() {
         you tell them, and just do the work.
       </p>
       <p>
-        Three quick screens, five keys, paste one prompt into Claude Code. Your assistant
-        is up in about ten minutes.
+        Paste one prompt into Claude Code. Your assistant interviews you, asks for a couple of
+        keys, and sets itself up - about 15 minutes.
       </p>
 
       <h2 style={{ marginTop: 32 }}>What stays on your Mac</h2>
       <ul style={{ paddingLeft: 20, lineHeight: 1.9 }}>
-        <li>Every key you paste into the wizard - never sent to us</li>
+        <li>Every key you hand your assistant - never sent to us</li>
         <li>Every conversation you have with your assistant</li>
         <li>Your notes, your memory, your context - all local</li>
       </ul>
@@ -23,7 +23,7 @@ export default function Docs() {
       <h2 style={{ marginTop: 32 }}>Connecting your accounts (step-by-step guides)</h2>
       <ul style={{ paddingLeft: 20, lineHeight: 1.9 }}>
         <li><Link href="/docs/telegram">Telegram</Link> - so your assistant can text you anywhere. Free, takes 60 seconds.</li>
-        <li><Link href="/docs/google">Google Workspace</Link> - Gmail, Drive, Docs, Calendar. Free, takes 5-10 minutes.</li>
+        <li><Link href="/docs/composio">Composio</Link> - one key connects Gmail, Calendar, Drive, Slack, Notion and 1000+ more. Free, about a minute.</li>
         <li><Link href="/docs/exa">Exa</Link> - smart web research for your assistant. Free tier, 1 minute.</li>
       </ul>
 

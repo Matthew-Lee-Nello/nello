@@ -15,19 +15,26 @@
  * `ctx` shape comes from `buildContext()` in bootstrap.js.
  */
 
+// The Composio Tool Router URL for one client (minted per user by the provisioner,
+// scripts/composio-provision.py, with the `destructiveHint` tag disabled so the
+// agent can read/send/create across 1000+ apps but never delete or trash). The
+// agent sees ~6 meta-tools (search / execute / manage-connections) and pulls in
+// only what it needs, so the tool list stays tiny no matter how many apps connect.
+// Durable: the URL keeps working once created.
+export function composioMcpUrl(env) {
+  return env.COMPOSIO_MCP_URL || ''
+}
+
 export function renderMcpJson(ctx) {
   const mcps = ctx.mcps || {}
   const env = ctx.env || {}
   const servers = {}
 
-  if (mcps.google) {
-    servers.google_workspace = {
-      command: 'uvx',
-      args: ['workspace-mcp'],
-      env: {
-        GOOGLE_OAUTH_CLIENT_ID: env.GOOGLE_OAUTH_CLIENT_ID || '',
-        GOOGLE_OAUTH_CLIENT_SECRET: env.GOOGLE_OAUTH_CLIENT_SECRET || '',
-      },
+  if (mcps.composio) {
+    servers.composio = {
+      type: 'http',
+      url: composioMcpUrl(env),
+      headers: { 'x-api-key': env.COMPOSIO_API_KEY || '' },
     }
   }
   if (mcps.obsidian) {
@@ -59,14 +66,11 @@ export function renderClaudeDesktopConfig(ctx) {
   const env = ctx.env || {}
   const servers = {}
 
-  if (mcps.google) {
-    servers.google_workspace = {
-      command: 'uvx',
-      args: ['workspace-mcp'],
-      env: {
-        GOOGLE_OAUTH_CLIENT_ID: env.GOOGLE_OAUTH_CLIENT_ID || '',
-        GOOGLE_OAUTH_CLIENT_SECRET: env.GOOGLE_OAUTH_CLIENT_SECRET || '',
-      },
+  if (mcps.composio) {
+    servers.composio = {
+      type: 'http',
+      url: composioMcpUrl(env),
+      headers: { 'x-api-key': env.COMPOSIO_API_KEY || '' },
     }
   }
   if (mcps.obsidian) {

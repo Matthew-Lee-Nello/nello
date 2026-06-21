@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * nello-claw bootstrap - renders the wizard bundle into a live installation.
+ * nello-claw bootstrap - renders the install bundle into a live installation.
  *
- * Input: ./bundle.json (or NC_BUNDLE env path) - wizard answers JSON
+ * Input: ./bundle.json (or NC_BUNDLE env path) - install-interview answers JSON, assembled locally
  * Output: personalised files written into the install dir (CWD)
  *
  * Steps:
@@ -85,7 +85,7 @@ function toPosixPath(p) {
 // needs a row here too — otherwise the bullet shows the name with an
 // empty purpose.
 const MCP_PURPOSES = {
-  google: 'Gmail, Calendar, Drive, Docs, Sheets via workspace-mcp',
+  composio: 'Gmail, Calendar, Drive, Docs, Sheets + 250 more apps - one-click OAuth, no Google Cloud setup',
   obsidian: 'read/write your vault directly',
   exa: 'web research with citations',
   apify: 'web scraping + Actor marketplace',
@@ -136,6 +136,21 @@ function buildContext(bundle) {
 function writeEnv(bundle) {
   const keys = { ...(bundle.keys || {}) }
 
+  // Pick-one messaging channel chosen at setup (Telegram OR WhatsApp). Drives which
+  // owner-lock applies and which bot the daemon starts. Precedence: the live .env
+  // value wins (so a post-install /connect-* switch survives a full re-run - keys
+  // carries the .env overlay here), then the explicit bundle field, then inference
+  // from whichever channel's key is present, else telegram. Persisted to .env so the
+  // daemon (config.ts) can refuse the wrong bot even if a stale key lingers.
+  const envChannel = String(keys.MESSAGING_CHANNEL || '').trim().toLowerCase()
+  const channel = (envChannel === 'telegram' || envChannel === 'whatsapp')
+    ? envChannel
+    : (bundle.messagingChannel
+        || (keys.TELEGRAM_BOT_TOKEN ? 'telegram'
+            : keys.WHATSAPP_OWNER_NUMBER ? 'whatsapp'
+            : 'telegram'))
+  keys.MESSAGING_CHANNEL = channel
+
   // Telegram owner lock. The wizard can supply the owner chat ID either as a
   // top-level `telegramChatId` field (PR-7.1) or inside keys.ALLOWED_CHAT_ID
   // (existing wizard path). The explicit field wins. Writing this into .env is
@@ -145,15 +160,23 @@ function writeEnv(bundle) {
   const ownerChatId = String(bundle.telegramChatId ?? keys.ALLOWED_CHAT_ID ?? '').trim()
   if (ownerChatId) keys.ALLOWED_CHAT_ID = ownerChatId
 
-  // Fail closed on an unlocked bot. If a Telegram token ships but no owner chat
-  // ID, discovery.ts does first-message-wins pairing and hands ownership of a
-  // bypassPermissions assistant to whoever messages the bot first. install.sh
-  // asserts this after the fact, but the conversational install runs bootstrap
-  // directly (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard the
-  // invariant here, where every entry path passes through.
-  if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
-    fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
-    process.exit(1)
+  if (channel === 'whatsapp') {
+    // WhatsApp-only install: Telegram must be fully absent so the daemon can't
+    // enter Telegram discovery (index.ts) and .env carries no empty Telegram noise.
+    // The owner number is captured after install by /connect-whatsapp (QR link).
+    delete keys.TELEGRAM_BOT_TOKEN
+    delete keys.ALLOWED_CHAT_ID
+  } else {
+    // Telegram install: fail closed on an unlocked bot. If a Telegram token ships
+    // but no owner chat ID, discovery.ts does first-message-wins pairing and hands
+    // ownership of a bypassPermissions assistant to whoever messages the bot first.
+    // install.sh asserts this after the fact, but the conversational install runs
+    // bootstrap directly (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard
+    // the invariant here, where every entry path passes through.
+    if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
+      fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
+      process.exit(1)
+    }
   }
 
   // Dashboard auth token (v1 security blocker). The dashboard + its chat route
@@ -191,13 +214,52 @@ function writeEnv(bundle) {
   try { chmodSync(envPath, 0o600) } catch {}
 }
 
+// Parse an existing .env into a plain object, stripping the surrounding quotes
+// writeEnv adds to values that contain a space or '#'. Used to overlay the live
+// .env onto bundle.keys so .env is the source of truth on any re-run (and the
+// `--configs-only` fast sync). Missing/unreadable file → {}.
+function readEnvOverlay(envPath) {
+  const out = {}
+  try {
+    if (!existsSync(envPath)) return out
+    for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+      const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+      if (!m) continue
+      out[m[1]] = m[2].replace(/\r$/, '').replace(/^["']|["']$/g, '')
+    }
+  } catch {}
+  return out
+}
+
+// Stamp the install with the code version it was built from, so /install-doctor
+// and the assistant can tell when a client is behind origin/main and prompt an
+// update. Best-effort: missing git or a detached repo just skips it, never fatal.
+function writeVersionStamp(installPath) {
+  try {
+    const opts = { cwd: TEMPLATE_DIR, stdio: ['ignore', 'pipe', 'ignore'] }
+    const commit = execSync('git rev-parse --short HEAD', opts).toString().trim()
+    const date = execSync('git log -1 --format=%cI', opts).toString().trim()
+    const stamp = { commit, date, stampedAt: new Date().toISOString() }
+    writeFileSync(join(installPath, '.nello-version'), JSON.stringify(stamp, null, 2) + '\n')
+  } catch {}
+}
+
 // Every server name a given renderer can emit (all baseline flags on). Derived
 // from the renderer itself, not hardcoded, so the managed set can never drift
 // from render-configs.js. .mcp.json and claude_desktop_config.json have
 // different baseline sets, so each call passes its own renderer's set.
+// Servers nello-claw shipped before the Composio migration. The current renderer
+// never emits these, so without listing them here an old install's stale
+// google_workspace / workspace-mcp entry would be treated as client-added and
+// preserved on re-sync - and keep prompting for Google OAuth after an update.
+// Listing them as "managed" makes a re-run (or `--configs-only`) prune them.
+// Kept tight to the names nello-claw itself shipped, so a client's own MCPs are
+// never touched.
+const DEPRECATED_MCP_KEYS = ['google_workspace', 'workspace-mcp']
+
 function managedMcpKeys(renderFn) {
-  const allOn = { mcps: { google: true, obsidian: true, exa: true, apify: true, tavily: true, firecrawl: true }, env: {}, vaultPath: '' }
-  return new Set(Object.keys(renderFn(allOn).mcpServers || {}))
+  const allOn = { mcps: { composio: true, obsidian: true, exa: true, apify: true, tavily: true, firecrawl: true }, env: {}, vaultPath: '' }
+  return new Set([...Object.keys(renderFn(allOn).mcpServers || {}), ...DEPRECATED_MCP_KEYS])
 }
 
 // Write the rendered MCP config, preserving servers a client added post-install
@@ -509,80 +571,26 @@ function installUv() {
 let _obsidianInstalled = false
 
 function installObsidianApp() {
-  // Cross-platform Obsidian install with real fallbacks. Idempotent - skips if
-  // already installed. Runs from bootstrap so EVERY entry path gets Obsidian
-  // (bash one-liner, PowerShell, Claude Code paste-in, manual git clone all
-  // hit this same code).
+  // Obsidian is a NAMED manual prerequisite now (the site tells the owner to grab
+  // it alongside VS Code). We no longer download it here — the old brew/dmg/winget/
+  // PowerShell-asset paths were the flakiest part of the whole install. Just detect
+  // whether it's present so the end-of-install summary and the auto-open-vault step
+  // (gated on _obsidianInstalled) behave correctly; warn with the link if missing.
+  // The vault works as plain markdown either way.
   const platform = process.platform
+  const winCandidates = [
+    join(process.env.LOCALAPPDATA || '', 'Obsidian', 'Obsidian.exe'),
+    join(process.env.LOCALAPPDATA || '', 'Programs', 'Obsidian', 'Obsidian.exe'),
+    'C:\\Program Files\\Obsidian\\Obsidian.exe',
+    'C:\\Program Files (x86)\\Obsidian\\Obsidian.exe',
+  ]
+  let present = false
+  if (platform === 'darwin') present = existsSync('/Applications/Obsidian.app')
+  else if (platform === 'win32') present = winCandidates.some(p => existsSync(p))
+  else { try { present = !!execSync('command -v obsidian', { stdio: 'pipe' }).toString().trim() } catch {} }
 
-  if (platform === 'darwin') {
-    if (existsSync('/Applications/Obsidian.app')) { ok('Obsidian.app already installed'); _obsidianInstalled = true; return }
-    // Try Homebrew first
-    try {
-      execSync('which brew', { stdio: 'pipe' })
-      execSync('brew install --cask obsidian', { stdio: 'pipe' })
-      if (existsSync('/Applications/Obsidian.app')) { ok('Obsidian.app installed via Homebrew'); _obsidianInstalled = true; return }
-    } catch {}
-    // Fallback - download .dmg directly + open it. User drag-drops to Applications.
-    // Better than nothing: at least the user sees Obsidian in their face.
-    try {
-      const dmg = join(process.env.TMPDIR || '/tmp', 'Obsidian.dmg')
-      execSync(`curl -fsSL -o "${dmg}" https://github.com/obsidianmd/obsidian-releases/releases/latest/download/Obsidian-universal.dmg`, { stdio: 'pipe' })
-      execSync(`open "${dmg}"`, { stdio: 'pipe' })
-      warn('Obsidian.dmg opened - drag the app icon to Applications, then close the disk image. Vault still works as plain markdown if you skip.')
-    } catch {
-      warn('Obsidian install skipped - get it from https://obsidian.md/download (vault still works as plain markdown)')
-    }
-  } else if (platform === 'win32') {
-    const exeCandidates = [
-      join(process.env.LOCALAPPDATA || '', 'Obsidian', 'Obsidian.exe'),
-      join(process.env.LOCALAPPDATA || '', 'Programs', 'Obsidian', 'Obsidian.exe'),
-      'C:\\Program Files\\Obsidian\\Obsidian.exe',
-      'C:\\Program Files (x86)\\Obsidian\\Obsidian.exe',
-    ]
-    if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian already installed'); _obsidianInstalled = true; return }
-    // Try winget first
-    try {
-      execSync('winget install --silent --accept-source-agreements --accept-package-agreements Obsidian.Obsidian', { stdio: 'pipe' })
-      if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via winget'); _obsidianInstalled = true; return }
-    } catch {}
-    // Fallback - resolve latest installer asset via GitHub Releases API then download.
-    // Earlier versions of this script hit a hardcoded URL that 404'd because Obsidian
-    // ships versioned filenames (e.g. Obsidian-1.5.12.exe), not a stable Obsidian.exe.
-    try {
-      const installer = join(process.env.TEMP || process.env.LOCALAPPDATA || '.', 'Obsidian-installer.exe')
-      // Escape PowerShell single-quote literal for paths that may contain `'`
-      // (e.g. `C:\Users\O'Brien\AppData\Local\Temp`). Without this the single-
-      // quoted PS string breaks and the user gets a confusing parser error or,
-      // worse, runs arbitrary follow-on text as a command.
-      const installerPsLit = installer.replace(/'/g, "''")
-      info('Resolving latest Obsidian installer (winget unavailable)...')
-      const ps = [
-        "$ErrorActionPreference='Stop'",
-        "$rel = Invoke-RestMethod 'https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest'",
-        "$asset = $rel.assets | Where-Object { $_.name -match '^Obsidian-\\d+\\.\\d+\\.\\d+\\.exe$' } | Select-Object -First 1",
-        "if (-not $asset) { throw 'no matching installer in latest release' }",
-        `Invoke-WebRequest -Uri $asset.browser_download_url -OutFile '${installerPsLit}'`,
-      ].join('; ')
-      // spawnSync with argv avoids the cmd.exe quoting layer entirely — safer than
-      // execSync(`powershell -Command "${ps}"`) when ps contains nested quotes.
-      const psRes = spawnSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'pipe' })
-      if (psRes.status !== 0) {
-        throw new Error(psRes.stderr?.toString().split('\n')[0] || 'powershell download failed')
-      }
-      const runRes = spawnSync(installer, ['/S'], { stdio: 'pipe' })  // /S = silent install
-      if (runRes.status !== 0) {
-        throw new Error(runRes.stderr?.toString().split('\n')[0] || 'installer exit non-zero')
-      }
-      if (exeCandidates.some(p => existsSync(p))) { ok('Obsidian installed via direct download'); _obsidianInstalled = true; return }
-      warn('Obsidian installer ran but app not found at expected path. Open https://obsidian.md/download and install manually.')
-    } catch (err) {
-      const reason = err?.stderr?.toString().split('\n')[0] || err?.message?.split('\n')[0] || 'unknown'
-      warn(`Obsidian install skipped (${reason}) - get it from https://obsidian.md/download (vault still works as plain markdown)`)
-    }
-  } else {
-    warn('Linux: install Obsidian manually from https://obsidian.md/download (vault still works as plain markdown)')
-  }
+  if (present) { ok('Obsidian found'); _obsidianInstalled = true }
+  else warn('Obsidian not found - install it from https://obsidian.md/download (the vault still works as plain markdown without it)')
 }
 
 function seedMorningBrief(bundle) {
@@ -673,12 +681,11 @@ function detectStaleInstalls() {
   if (process.platform === 'linux') warn(`  systemctl --user disable --now ${LAUNCHAGENT_LABEL}; rm ~/.config/systemd/user/${LAUNCHAGENT_LABEL}.service`)
 }
 
-// Hand-rolled bundle schema check. Hosted wizard already produces well-shaped
-// bundles, but bundle.json is the trust boundary between the wizard host and
-// the customer machine — anything that lands in ~/Downloads can be replaced
-// or tampered with before install. Reject unknown top-level keys and bad
-// types so a hostile bundle can't smuggle extra data into context that later
-// drives file writes or process spawning.
+// Hand-rolled bundle schema check. The assistant assembles bundle.json locally
+// from the install interview, but it's still the trust boundary into bootstrap:
+// a hand-edited or tampered bundle must not smuggle extra data into context that
+// later drives file writes or process spawning. Reject unknown top-level keys and
+// bad types.
 const BUNDLE_KNOWN_KEYS = new Set([
   'name', 'assistantName', 'occupation', 'location', 'timezone', 'bio', 'age',
   'projects', 'teamMembers', 'clients', 'mentors', 'tools',
@@ -695,6 +702,8 @@ const BUNDLE_KNOWN_KEYS = new Set([
   'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
   'enableAutoFetch', 'autoFetchCron',
   'telegramChatId',
+  // Pick-one messaging channel chosen at install: "telegram" or "whatsapp".
+  'messagingChannel',
 ])
 function validateBundle(bundle) {
   if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) {
@@ -703,7 +712,7 @@ function validateBundle(bundle) {
   }
   for (const key of Object.keys(bundle)) {
     if (!BUNDLE_KNOWN_KEYS.has(key)) {
-      fail(`bundle.json contains unknown key: ${JSON.stringify(key)}. Refusing to proceed — re-download a fresh bundle from labs.nello.gg.`)
+      fail(`bundle.json contains unknown key: ${JSON.stringify(key)}. Refusing to proceed. Re-assemble bundle.json from the install interview (INSTALL_GUIDE.md Step 5).`)
       process.exit(1)
     }
   }
@@ -720,6 +729,12 @@ function validateBundle(bundle) {
   }
   if (bundle.keys !== undefined && (typeof bundle.keys !== 'object' || Array.isArray(bundle.keys))) {
     fail('bundle.keys must be a plain object map')
+    process.exit(1)
+  }
+  if (bundle.messagingChannel !== undefined
+      && bundle.messagingChannel !== 'telegram'
+      && bundle.messagingChannel !== 'whatsapp') {
+    fail(`bundle.messagingChannel must be "telegram" or "whatsapp", got ${JSON.stringify(bundle.messagingChannel)}`)
     process.exit(1)
   }
 }
@@ -753,12 +768,63 @@ async function main() {
     process.exit(1)
   }
 
-  detectStaleInstalls()
+  const CONFIGS_ONLY = process.argv.includes('--configs-only')
+
+  if (!CONFIGS_ONLY) detectStaleInstalls()
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
   validateBundle(bundle)
+
+  // .env is the single source of truth for secrets once an install exists.
+  // Overlay it onto bundle.keys (env wins) so a re-run — and especially the
+  // `--configs-only` sync after the owner edits .env — regenerates configs from
+  // the live .env, not the frozen bundle.json. This also makes the Composio
+  // auto-provision below skip when COMPOSIO_MCP_URL already lives in .env (the
+  // minted URL is written to .env but never back to bundle.json), so there's no
+  // accidental re-mint. First install: .env doesn't exist yet → overlay empty →
+  // output unchanged.
+  bundle.keys = { ...(bundle.keys || {}), ...readEnvOverlay(join(INSTALL_PATH, '.env')) }
+
+  // Composio: the only value collected is the API key. Mint this install's durable
+  // Tool Router URL from it automatically (destructiveHint disabled = no delete/trash),
+  // so nobody pastes a URL. Skip if one was already provided (wizard pre-provisioned).
+  if (bundle.keys?.COMPOSIO_API_KEY && !bundle.keys?.COMPOSIO_MCP_URL) {
+    const userId = bundle.keys.COMPOSIO_USER_ID || bundle.keys.GOOGLE_USER_EMAIL
+    if (!userId) {
+      fail('COMPOSIO_API_KEY set but no COMPOSIO_USER_ID / GOOGLE_USER_EMAIL to key the connections to.')
+      process.exit(1)
+    }
+    info('Provisioning Composio Tool Router (no delete/trash)')
+    const { provisionRouterUrl } = await import('./scripts/composio-provision.mjs')
+    try {
+      bundle.keys.COMPOSIO_MCP_URL = await provisionRouterUrl(bundle.keys.COMPOSIO_API_KEY, userId)
+      ok('Composio router ready')
+    } catch (err) {
+      fail(`Composio provisioning failed: ${err.message?.split('\n')[0] || err}`)
+      process.exit(1)
+    }
+  }
+
   const ctx = buildContext(bundle)
   validateVaultPath(ctx.vaultPath)
+
+  // Record the code version this install was built from (for /install-doctor + the
+  // update-staleness check). Both the full install and --configs-only restamp.
+  writeVersionStamp(INSTALL_PATH)
+
+  // --configs-only: the `sync-env-to-configs.sh` fast path. Regenerate JUST
+  // .mcp.json + claude_desktop_config.json from the live .env (already overlaid
+  // onto bundle.keys above), then stop — no persona re-render, no vault reseed,
+  // no plugin/skill/service/Obsidian work, no audit, no dashboard poll. Byte-
+  // identical to the full path's config write (same renderers + managed sets),
+  // and writeMergedMcpConfig preserves client-added (unmanaged) MCP servers.
+  if (CONFIGS_ONLY) {
+    info('Syncing MCP configs from .env')
+    writeMergedMcpConfig(join(INSTALL_PATH, '.mcp.json'), renderMcpJson(ctx), managedMcpKeys(renderMcpJson))
+    writeMergedMcpConfig(join(INSTALL_PATH, 'claude_desktop_config.json'), renderClaudeDesktopConfig(ctx), managedMcpKeys(renderClaudeDesktopConfig))
+    ok('.mcp.json + claude_desktop_config.json synced from .env')
+    return
+  }
 
   // Upfront summary so user (and Claude in plan mode) sees every change before any of them happen.
   console.log(`${ACCENT}This bootstrap will make these changes:${RESET}`)

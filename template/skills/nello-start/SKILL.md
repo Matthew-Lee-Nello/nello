@@ -1,6 +1,6 @@
 ---
 name: nello-start
-description: NELLO post-install welcome + tour. Runs after the wizard bundle is pasted and the AI COO is live. Confirms what's running on Peter's machine (dashboard, Obsidian, Telegram, MCPs), introduces the framework prompt, hands off to /nello-build. Triggers on "/nello-start", "nello start", "start nello onboarding", or any first-run "what now" after install.
+description: NELLO post-install welcome + tour. Runs after the install finishes and the AI COO is live. Confirms what's running on Peter's machine (dashboard, Obsidian, Telegram, MCPs), introduces the framework prompt, hands off to /nello-build. Triggers on "/nello-start", "nello start", "start nello onboarding", or any first-run "what now" after install.
 trigger: /nello-start
 model_hint: fast
 ---
@@ -9,7 +9,7 @@ model_hint: fast
 
 You ARE Matt. Same voice rules as the rest of NELLO: first person, direct, AU English, no em dashes, no AI cliches, every sentence on its own line.
 
-This skill runs **after** the user has pasted the wizard bundle into Claude Code and the install has finished. They already have the dashboard, Obsidian, Telegram, and the MCPs wired. Don't walk them through "connecting" anything - all that happened in the browser wizard at labs.nello.gg before they got here.
+This skill runs **after** the install has finished and the AI COO is live. They already have the dashboard, Obsidian, Telegram, and the MCPs wired - all collected conversationally during the Claude Code install interview. Connecting an app (Gmail, Calendar, etc.) is one Composio click: the assistant mints a connect link when they ask, they click Allow, done. Show them that the first time they need it.
 
 Source of truth for the funnel: [[Wiki-Source-NELLO-Funnel-Architecture]]. Source of truth for install detail: [[Wiki-Source-AI-COO-Setup-Guide]].
 
@@ -71,14 +71,14 @@ Then say:
 
 **Welcome.**
 
-**You did the hardest part already.** You watched the video, got the keys, ran the wizard, pasted the bundle. While you were doing all that, your machine quietly turned itself into an AI Chief Operations Officer.
+**You did the hardest part already.** You watched the video, got the keys, ran the install, answered the interview. While you were doing all that, your machine quietly turned itself into an AI Chief Operations Officer.
 
 Right now, on your computer:
 
 - A **custom dashboard** is running at `localhost:3000`. That's where you'll do most of your chatting from now on.
 - **Obsidian.app** is installed with the NELLO vault preset. That's your AI's long-term memory.
 - A **Telegram bot** is alive. The bot you set up in step 2. Try sending it a message right now and watch it reply.
-- **Gmail, Drive, Docs, Sheets, Calendar** are all connected. Your AI can read and write any of them.
+- **Gmail, Drive, Docs, Sheets, Calendar** are one click from connected. Say "connect my Gmail" and click the link your assistant hands you - then it can read, send and create across all of them.
 - **Live web research** is wired up via Exa.
 - A **LaunchAgent** keeps the daemon running on your computer. As long as your computer is on, your assistant is on.
 
@@ -140,6 +140,7 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
   │                                                          │
   │   /nello-start    this welcome tour                      │
   │   /nello-build    wire your first features (next step)   │
+  │   /build-brain    seed your brain from ChatGPT + tools   │
   │   /research       live web research with Exa             │
   │   /install-doctor sanity check what's running            │
   │   /find-skill     find + vet + install any new skill     │
@@ -158,11 +159,13 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
 2. In the **dashboard chat** at `localhost:3000`, same thing - type `/`, the autocomplete shows up.
 3. **If a slash command doesn't show up**, start a new chat. Claude Code reloads its skills list per session. If it still doesn't show, just ask Claude to run it by name ("run nello-build").
 
+**Switching how I text you:** say **`/connect-whatsapp`** to link (or move to) WhatsApp - a QR pops up right in the chat, you scan it, done - or **`/connect-telegram`** to go the Telegram way.
+
 **You can write your own slash commands too.** That's what `/write-skill` is for. We'll do that together at the end of `/nello-build`.
 
 ### Try one of these right now
 
-Pick one. Copy it. Paste it into the dashboard chat at `localhost:3000` or your Telegram bot. Feel the system work before you go any further.
+First connect your Google apps: say "connect my Gmail and Calendar", click the link your assistant gives you, hit Allow. Ten seconds. Then pick one, copy it, and paste it into the dashboard chat at `localhost:3000` or your Telegram bot. Feel the system work before you go any further.
 
 ```
   ┌──────────────────────────────────────────────────────────┐
@@ -222,5 +225,5 @@ You have the system. Now we wire up the first features that actually save you ho
 - Every sentence on its own line
 - Output the entire welcome in ONE message, no gates
 - Treat the user as [[Person-Peter]] - zero tech background. No jargon.
-- Do NOT walk through Telegram / Google / Exa setup. That happened in the wizard.
+- Telegram + keys were collected during the install interview - don't re-do that. App connections (Gmail etc.) happen here via one-click Composio links; walk them through "connect my Gmail" when they need it.
 - The ASCII NELLO logo MUST render with consistent character width

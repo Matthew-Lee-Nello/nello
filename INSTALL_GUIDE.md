@@ -59,9 +59,15 @@ Capture honestly. Empty arrays are fine where they genuinely have nothing yet - 
 
 ## Step 4 - Core credentials
 
-Three services everyone gets: **Telegram** (the assistant texts them), **Google** (Gmail / Drive / Calendar), **Exa** (live web search). Walk each one, paste, validate, confirm. Keys never leave their machine - say so.
+Walk each one, paste, validate, confirm. Keys never leave their machine - say so.
 
-### 4a. Telegram
+### 4a. Pick your messaging channel
+Ask in plain words: **"Do you want your assistant to reach you on Telegram or on WhatsApp? Pick one - you can switch later."** Set `messagingChannel` to their answer: `"telegram"` or `"whatsapp"`.
+
+- **Telegram** → do 4b below (bot token + chat ID).
+- **WhatsApp** → **collect nothing else for messaging.** Skip 4b. After install they run `/connect-whatsapp`: a QR code appears right here in this chat, they scan it with their phone (WhatsApp → Settings → Linked Devices → Link a Device), and their own number is captured for them. Don't ask for a phone number. (WhatsApp runs on their own number over the unofficial Web protocol - small flag risk, mention it once.)
+
+### 4b. Telegram (only if they chose Telegram in 4a)
 1. **Bot token:** open Telegram, message **@BotFather**, send `/newbot`, follow the prompts, copy the token it gives back.
    - Validate against `^\d+:[A-Za-z0-9_-]{30,}$`. If it fails, they pasted something else - ask again.
    - → `keys.TELEGRAM_BOT_TOKEN`
@@ -69,22 +75,15 @@ Three services everyone gets: **Telegram** (the assistant texts them), **Google*
    - Validate against `^-?\d{5,}$`.
    - → `telegramChatId` **and** `keys.ALLOWED_CHAT_ID` (set both to the same value - this is the owner lock). The bootstrap hard-fails if a bot token is present but this is empty, so the bot never ships open to the world. Don't work around that failure by inventing a value - go get the real chat ID.
 
-### 4b. Google (their own OAuth app - ~10 min, one time)
-They create their own Google Cloud app so their data stays theirs. Walk it slowly:
+### 4c. Connections (via Composio Tool Router - no Google Cloud setup)
+Every app (Gmail, Calendar, Drive, Docs, Sheets, plus Slack, Notion, CRMs - 1000+) connects through one **Composio Tool Router** with a single OAuth click each. No Google Cloud project, no consent screen, no client-id/secret. The actual app connections happen after install (Step 7), by the assistant itself. You collect just two values here:
 
-1. Go to **console.cloud.google.com**. Create a new project (top bar → project dropdown → New project), name it anything (e.g. "my-assistant"), select it.
-2. **Enable the APIs** they'll use. Search each in the top bar and click Enable: **Gmail API**, **Google Calendar API**, **Google Drive API**, **Google Docs API**, **Google Sheets API**.
-3. **OAuth consent screen** (left menu → APIs & Services → OAuth consent screen): choose **External**, give it an app name, put their own email as support + developer contact, save.
-4. **Add themselves as a test user:** on the consent screen / Audience tab → **Test users** → add their Google email. (Skipping this is the #1 reason Google auth fails later - an unverified app only works for listed test users.)
-5. **Create the credential:** APIs & Services → Credentials → **Create credentials → OAuth client ID → Application type: Desktop app** → Create. Copy the **Client ID** and **Client secret**.
-6. Collect and validate:
-   - `keys.GOOGLE_USER_EMAIL` - their Google address (email format).
-   - `keys.GOOGLE_OAUTH_CLIENT_ID` - length > 30 or ends `apps.googleusercontent.com`.
-   - `keys.GOOGLE_OAUTH_CLIENT_SECRET` - length > 20.
+1. `keys.COMPOSIO_API_KEY` - the Composio **project** API key (NELLO provides one; or make one at **dashboard.composio.dev**). The only Composio value anyone pastes.
+2. `keys.GOOGLE_USER_EMAIL` - their email address. Doubles as their Composio `user_id`, so all their connections live under it.
 
-If Google auth errors after install, the usual fixes are: they weren't added as a test user (Step 4), or the OAuth client type didn't match what `workspace-mcp` expects - check the `workspace-mcp` README for the current redirect/client-type and recreate the credential.
+The installer mints this client's durable router URL (`COMPOSIO_MCP_URL`) from the key automatically during bootstrap, with delete/trash blocked - you do NOT paste a URL. Validate: `COMPOSIO_API_KEY` starts `ak_`, `GOOGLE_USER_EMAIL` is a valid email. Nothing to paste from Google at all.
 
-### 4c. Exa
+### 4d. Exa
 1. Go to **dashboard.exa.ai**, sign up (free tier is fine), copy an API key.
 2. Validate length > 20. → `keys.EXA_API_KEY`
 
@@ -106,10 +105,11 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
   "communicationStyle": "direct", "language": "AU",
   "emDashPolicy": "never", "oxfordComma": false, "bannedWords": [],
   "vaultPreset": "nello", "graphifyEnabled": true,
-  "mcps": { "google": true, "obsidian": true, "exa": true },
+  "messagingChannel": "telegram",
+  "mcps": { "composio": true, "obsidian": true, "exa": true },
   "keys": {
     "TELEGRAM_BOT_TOKEN": "", "ALLOWED_CHAT_ID": "",
-    "GOOGLE_USER_EMAIL": "", "GOOGLE_OAUTH_CLIENT_ID": "", "GOOGLE_OAUTH_CLIENT_SECRET": "",
+    "GOOGLE_USER_EMAIL": "", "COMPOSIO_API_KEY": "",
     "EXA_API_KEY": ""
   },
   "telegramChatId": "",
@@ -121,7 +121,9 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
 }
 ```
 
-`tools` is the plain list of what their business runs on (you'll fill it in Step 7). The baseline `mcps` trio (google / obsidian / exa) ships for everyone - leave those on.
+`tools` is the plain list of what their business runs on (you'll fill it in Step 7). The baseline `mcps` trio (composio / obsidian / exa) ships for everyone - leave those on. Composio is the one connection layer for every OAuth app, so there's no per-app MCP to wire.
+
+**For a WhatsApp install:** set `"messagingChannel": "whatsapp"` and leave `TELEGRAM_BOT_TOKEN`, `ALLOWED_CHAT_ID` and `telegramChatId` empty (or drop them). No phone number goes in the bundle - `/connect-whatsapp` captures it after install when they scan the QR.
 
 ---
 
@@ -129,32 +131,40 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
 
 1. **Summarise** for approval: "I'm about to run the installer. It will write `CLAUDE.md`, `.env` (chmod 600), seed your Obsidian vault, symlink skills into `~/.claude/skills/`, install Obsidian + a login item so your assistant starts on boot, and start the dashboard at localhost:3000. Nothing leaves your machine. OK to run?"
 2. On yes: `NC_INSTALL_PATH=$(pwd) node ./template/bootstrap.js` (it reads `./bundle.json`). The bootstrap prints its own change log.
-3. **Verify the owner lock took** before you let the daemon keep running: run `grep -q '^ALLOWED_CHAT_ID=.\+' .env`. If it fails, **stop** - do not leave the daemon up - re-collect the chat ID (Step 4a) and re-run the bootstrap. (The bootstrap itself also hard-fails on an empty lock when a bot token is set; this is the belt-and-braces check.) Then confirm the dashboard answers on `localhost:3000`.
+3. **(Telegram installs) Verify the owner lock took** before you let the daemon keep running: run `grep -q '^ALLOWED_CHAT_ID=.\+' .env`. If it fails, **stop** - do not leave the daemon up - re-collect the chat ID (Step 4b) and re-run the bootstrap. (The bootstrap itself also hard-fails on an empty lock when a bot token is set; this is the belt-and-braces check.) For a **WhatsApp install** there's no chat-ID lock here - the lock is the linked phone, captured later by `/connect-whatsapp`; just confirm the dashboard answers on `localhost:3000`.
 
 ---
 
-## Step 7 - Their tool stack (the part that makes every client different)
+## Step 7 - Connect their apps (the assistant does this itself)
 
-Two clients are never the same. Now wire what *this* one runs on.
+The Tool Router wired in Step 4b reaches 1000+ apps. There is no per-app MCP to install and no credential to paste - the **assistant connects apps itself** by calling its `COMPOSIO_MANAGE_CONNECTIONS` tool.
 
-1. Ask: **"Beyond Google, what does your business actually run on day to day?"** Slack, Notion, HubSpot, Salesforce, Linear, GitHub, Stripe, Xero, Apify - whatever they name. Record the list into `tools` (re-run the relevant render or note it for CLAUDE.md context).
-2. For **each** tool they named, wire it the proper way using the bundled **`mcp-implement`** skill (read `~/.claude/skills/mcp-implement/SKILL.md`): vet the server (via `find-skill`'s checklist) → classify stateless/stateful → install pinned (never `npx -y` in the saved config) → add it to **this install's** `.mcp.json` + `claude_desktop_config.json` → collect that tool's credentials the same paste-and-validate way → **verify with one real read-only tool call** → restart the daemon.
-3. Anything with no known MCP → fall back to `find-skill` discovery, vet, install.
-4. Don't over-collect. Wire what they'll use this week; tell them they can add more anytime by saying *"find me a connection for X."*
+So you (or the owner, anytime after install) just say to the assistant:
+
+> "Connect my Gmail and Calendar." / "Connect Slack." / "Give me a link for Notion."
+
+The assistant returns a `https://connect.composio.dev/link/...` URL; they open it, approve, done. From then on the assistant can read / send / create on that app - but **cannot delete or trash** (blocked server-side).
+
+Start them off by connecting `gmail` + `googlecalendar`; add the rest as needed. Genuinely niche or in-house systems not in Composio's catalogue are the only case for the bundled `mcp-implement` skill - Composio first, `mcp-implement` only for the gaps.
 
 ---
 
 ## Step 8 - Seed the brain into the vault
 
-The persona in `CLAUDE.md` now carries their business. Make the vault match so search + the graph have something to stand on. From the Step 3 answers, write starter notes in the vault taxonomy (`nello` preset → `Person-`, `Client-`, `Project-` prefixes with `type`/`tags`/`date` frontmatter): one note per client, per team member, per active project. Keep them short - name, role/status, one or two facts. The auto-memory hook grows them over time.
+The persona in `CLAUDE.md` now carries their business. Make the vault match so search + the graph have something to stand on. Two ways to fill it - do both:
+
+1. **From the interview.** From the Step 3 answers, write starter notes in the vault taxonomy (`nello` preset → `Person-`, `Client-`, `Project-` prefixes with `type`/`tags`/`date` frontmatter): one note per client, per team member, per active project. Keep them short - name, role/status, one or two facts. The auto-memory hook grows them over time.
+
+2. **From their ChatGPT history (optional, powerful).** Ask plainly: **"Have you got a ChatGPT export handy? If you do, just tell me where it is and I'll fold all of it into your brain."** If they don't have one, tell them how to get it: chatgpt.com → Settings → Data controls → Export data → they get an email → download the `.zip`. If they hand you anything - the `.zip`, an unzipped folder, or "it's in my Downloads" - run **`/build-brain`** on that path now. It parses every conversation, archives them, and mines out the people, clients, projects and preferences into the taxonomy (deduped, re-runnable). They can also run `/build-brain` any time later.
 
 ---
 
 ## Step 9 - Verify + hand off
 
 1. Run **`/install-doctor`** - work the report top to bottom, fix anything red (most common: Claude Code auth, or a missing key).
-2. Tell them to **send their Telegram bot a message** to finish the phone link.
+2. **Connect their phone.** If they chose Telegram, tell them to send their bot a message to finish the link (discovery captures the chat ID and the daemon self-restarts). If they chose WhatsApp, run **`/connect-whatsapp`** now - a QR appears in this chat, they scan it, and they're linked.
 3. Hand off: **"Run `/nello-start`"** - it tours what's now running and chains into `/nello-build` to wire their first features.
+4. Point them at two things for later: **`/build-brain`** (imports their exported ChatGPT history + backfills connected tools into the vault) and **`/update`** (pulls the latest nello-claw any time, vault + settings preserved - see [UPDATE_GUIDE.md](UPDATE_GUIDE.md)).
 
 ---
 
