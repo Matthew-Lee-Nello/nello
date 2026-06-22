@@ -2,13 +2,17 @@
  * link.ts - one-shot WhatsApp linker for the /connect-whatsapp skill.
  *
  * Boots a SINGLE Baileys socket on the same session dir the daemon uses, renders
- * the pairing QR to a PNG (so the assistant can Read it and show it inside VS
- * Code), auto-captures the owner's number from the linked session, writes
- * WHATSAPP_OWNER_NUMBER into .env, and exits. The daemon must be stopped while
- * this runs - .wa-session must only ever have one live socket.
+ * the pairing QR as an ASCII block on stdout (the assistant pastes it straight
+ * into the chat - works in any chat pane / terminal, any OS) PLUS a PNG fallback
+ * the assistant can open in the native image viewer, auto-captures the owner's
+ * number from the linked session, writes WHATSAPP_OWNER_NUMBER into .env, and
+ * exits. The daemon must be stopped while this runs - .wa-session must only ever
+ * have one live socket.
  *
  * It speaks to the skill through one-line sentinels on stdout:
- *   LINK_QR_READY <png> <ts>   a fresh QR PNG was written (re-emitted on ~20s rotation)
+ *   LINK_QR_ASCII_BEGIN <ts>   start of a fresh ASCII QR block on stdout (PRIMARY display)
+ *   LINK_QR_ASCII_END <ts>     end of the ASCII QR block (same <ts> as the matching READY)
+ *   LINK_QR_READY <png> <ts>   a fresh QR PNG was written - fallback (re-emitted on ~20s rotation)
  *   LINK_PAIR_CODE <code>      pairing-code fallback (when run with --pair <number>)
  *   LINK_SUCCESS <number>      linked; owner number captured + written to .env
  *   LINK_401                   WhatsApp refused the link (throttled) - back off, don't retry fast
@@ -103,9 +107,33 @@ async function connect(): Promise<void> {
     }
 
     if (qr && !pairNumber) {
+      const ts = Date.now()
+      // PRIMARY display: an ASCII QR the assistant pastes straight into the chat,
+      // wrapped in sentinels so the skill can lift a clean block. No inline-image
+      // rendering needed, so it works in any chat pane / terminal on any OS.
+      try {
+        // Cast: the @types default-import resolves `.toString` to Object.prototype's
+        // (0-arg) overload, but at runtime qrcode's own renderer shadows it.
+        const qrToString = QRCode.toString as unknown as
+          (text: string, opts: { type: string; small?: boolean }) => Promise<string>
+        // `small` packs two QR rows per text line with half-block glyphs (▀▄█), so the
+        // glyph SHAPES carry the whole code. The renderer also wraps each line in ANSI
+        // colour codes (black-on-white) for a real terminal - strip them, because a
+        // markdown chat pane shows raw escape codes as garbage and breaks the scan.
+        // eslint-disable-next-line no-control-regex
+        const ascii = (await qrToString(qr, { type: 'terminal', small: true }))
+          .replace(/\x1b\[[0-9;]*m/g, '')
+        emit(`LINK_QR_ASCII_BEGIN ${ts}`)
+        process.stdout.write(ascii.endsWith('\n') ? ascii : ascii + '\n')
+        emit(`LINK_QR_ASCII_END ${ts}`)
+      } catch (e) {
+        emit(`LINK_FAIL qr ascii render failed: ${(e as Error).message}`)
+      }
+      // FALLBACK display: a PNG the assistant opens in the native image viewer
+      // (open / start / xdg-open) if a text scan ever fails. Same <ts> as above.
       try {
         await QRCode.toFile(QR_PNG, qr, { width: 380, margin: 2 })
-        emit(`LINK_QR_READY ${QR_PNG} ${Date.now()}`)
+        emit(`LINK_QR_READY ${QR_PNG} ${ts}`)
       } catch (e) {
         emit(`LINK_FAIL qr png write failed: ${(e as Error).message}`)
       }

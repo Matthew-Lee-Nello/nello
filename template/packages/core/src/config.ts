@@ -30,6 +30,14 @@ export const WHATSAPP_SESSION_DIR = env['WHATSAPP_SESSION_DIR'] || join(PROJECT_
 // WhatsApp install even if a stale token lingers in .env. Empty/legacy = telegram.
 export const MESSAGING_CHANNEL = (env['MESSAGING_CHANNEL'] ?? '').trim().toLowerCase()
 
+// Which Claude Code setting scopes the agent loads. Default 'project,user' - 'user'
+// is where the install's skills + CLAUDE.md live, so clients need it. Override to
+// 'project' on a machine whose global ~/.claude is large (huge CLAUDE.md + many
+// SessionStart hooks), where loading 'user' overflows the prompt ("Prompt is too
+// long") and the agent exits 1. Comma-separated; values: project | user | local.
+export const AGENT_SETTING_SOURCES = (env['NC_SETTING_SOURCES'] ?? 'project,user')
+  .split(',').map(s => s.trim()).filter(Boolean)
+
 // Voice
 export const GROQ_API_KEY = env['GROQ_API_KEY'] ?? ''
 

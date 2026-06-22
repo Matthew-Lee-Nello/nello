@@ -6,6 +6,7 @@ import {
   Browsers,
   generateMessageID,
   normalizeMessageContent,
+  jidNormalizedUser,
   type WAMessage,
   type WASocket,
 } from '@whiskeysockets/baileys'
@@ -13,7 +14,7 @@ import qrcode from 'qrcode-terminal'
 import { mkdirSync } from 'node:fs'
 import {
   WHATSAPP_OWNER_NUMBER, WHATSAPP_SESSION_DIR, MAX_MESSAGE_LENGTH,
-  getSession, setSession,
+  getSession, setSession, clearSession,
   buildMemoryContext, saveConversationTurn,
   runAgent, logger,
 } from '@nc/core'
@@ -53,6 +54,9 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
   if (!ownerNumber) throw new Error('WHATSAPP_OWNER_NUMBER missing from .env')
   const sessionDir = opts.sessionDir ?? WHATSAPP_SESSION_DIR
   const ownerJid = `${ownerNumber}@s.whatsapp.net`
+  const ownerJidN = jidNormalizedUser(ownerJid)
+  let ownerLid = ''        // the owner's @lid identity - the self-chat often uses it
+  let chatJid = ownerJid   // where replies go = the thread the owner messages from
   const sentIds = new Set<string>()
   const startedAt = Math.floor(Date.now() / 1000)
   const queue: WAMessage[] = []
@@ -78,7 +82,7 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
       // trailing ECHO_MARK is a secondary net only.
       const messageId = generateMessageID()
       rememberSent(messageId)
-      await sock?.sendMessage(ownerJid, { text: chunk + ECHO_MARK }, { messageId })
+      await sock?.sendMessage(chatJid, { text: chunk + ECHO_MARK }, { messageId })
     }
   }
 
@@ -96,8 +100,13 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
   }
 
   function handle(m: WAMessage): void {
-    // Owner self-chat only - this is the assistant console, nobody else's DMs.
-    if (m.key.remoteJid !== ownerJid) return
+    // Self-chat can arrive under the phone JID OR the owner's @lid identity (newer
+    // multi-device addressing). Accept either; ignore anyone else.
+    if (!ownerLid && sock?.user?.lid) ownerLid = jidNormalizedUser(sock.user.lid)
+    const from = m.key.remoteJid ? jidNormalizedUser(m.key.remoteJid) : ''
+    if (from !== ownerJidN && (!ownerLid || from !== ownerLid)) return
+    // Reply back into whatever thread the owner is messaging from.
+    chatJid = m.key.remoteJid || ownerJid
 
     // PRIMARY echo guard: our own replies carry an id we recorded before sending.
     // Drop them and free the id (keeps sentIds bounded on the happy path).
@@ -138,7 +147,7 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
       const memContext = await buildMemoryContext(ownerNumber, text)
       const message = memContext ? `${memContext}\n${text}` : text
       const sessionId = getSession(ownerNumber)
-      await sock?.sendPresenceUpdate('composing', ownerJid)
+      await sock?.sendPresenceUpdate('composing', chatJid)
       const result = await runAgent(message, sessionId)
       if (result.newSessionId && result.newSessionId !== sessionId) {
         setSession(ownerNumber, result.newSessionId)
@@ -148,6 +157,9 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
       await reply(out)
     } catch (err) {
       logger.error({ err }, 'whatsapp handleMessage failed')
+      // Drop the session so the next message starts fresh - never let one bad
+      // (e.g. stale resume) turn wedge the conversation permanently.
+      try { clearSession(ownerNumber) } catch { /* ignore */ }
       try { await reply(`Error: ${err instanceof Error ? err.message : String(err)}`) } catch {}
     }
   }
