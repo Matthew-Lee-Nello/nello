@@ -7,6 +7,7 @@ import {
   generateMessageID,
   normalizeMessageContent,
   jidNormalizedUser,
+  downloadMediaMessage,
   type WAMessage,
   type WASocket,
 } from '@whiskeysockets/baileys'
@@ -16,7 +17,7 @@ import {
   WHATSAPP_OWNER_NUMBER, WHATSAPP_SESSION_DIR, MAX_MESSAGE_LENGTH,
   getSession, setSession, clearSession,
   buildMemoryContext, saveConversationTurn,
-  runAgent, logger,
+  runAgent, logger, ingestAttachment,
 } from '@nc/core'
 import { formatForWhatsApp, splitMessage } from './format.js'
 
@@ -52,10 +53,13 @@ export interface WhatsAppBot {
  * extract, and a single-flight queue serialises prompts so a second message arriving
  * mid-answer never starts a concurrent run or interleaves replies.
  */
-export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: string } = {}): WhatsAppBot {
+export function createWhatsAppBot(
+  opts: { ownerNumber?: string; sessionDir?: string; transcribe?: (path: string) => Promise<string> } = {},
+): WhatsAppBot {
   const ownerNumber = (opts.ownerNumber ?? WHATSAPP_OWNER_NUMBER).replace(/[^0-9]/g, '')
   if (!ownerNumber) throw new Error('WHATSAPP_OWNER_NUMBER missing from .env')
   const sessionDir = opts.sessionDir ?? WHATSAPP_SESSION_DIR
+  const transcribe = opts.transcribe
   const ownerJid = `${ownerNumber}@s.whatsapp.net`
   const ownerJidN = jidNormalizedUser(ownerJid)
   let ownerLid = ''        // the owner's @lid identity - the self-chat often uses it
@@ -102,6 +106,19 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
       || ''
   }
 
+  // Detect an inbound attachment (voice/audio/image/document/video) and pull mime
+  // + filename + the voice-note flag. Returns null for plain text. The download
+  // itself happens later, in processMessage (serialised by the queue).
+  function extractMedia(m: WAMessage): { mime: string; filename?: string; isPtt: boolean } | null {
+    const c = m.message ? normalizeMessageContent(m.message) : undefined
+    if (!c) return null
+    if (c.audioMessage) return { mime: c.audioMessage.mimetype || 'audio/ogg', isPtt: !!c.audioMessage.ptt }
+    if (c.imageMessage) return { mime: c.imageMessage.mimetype || 'image/jpeg', isPtt: false }
+    if (c.documentMessage) return { mime: c.documentMessage.mimetype || 'application/octet-stream', filename: c.documentMessage.fileName || undefined, isPtt: false }
+    if (c.videoMessage) return { mime: c.videoMessage.mimetype || 'video/mp4', isPtt: false }
+    return null
+  }
+
   function handle(m: WAMessage): void {
     // Self-chat can arrive under the phone JID OR the owner's @lid identity (newer
     // multi-device addressing). Accept either; ignore anyone else.
@@ -122,9 +139,11 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
     const ts = Number(m.messageTimestamp || 0)
     if (ts && ts < startedAt) return
 
-    if (!text.trim()) return
+    // Enqueue if there's text OR an attachment. A forwarded PDF / voice note has
+    // no text, so the old empty-drop silently swallowed every file.
+    if (!text.trim() && !extractMedia(m)) return
 
-    // Single-flight: queue the prompt and drain one at a time, in arrival order.
+    // Single-flight: queue the message and drain one at a time, in arrival order.
     queue.push(m)
     void drain()
   }
@@ -138,17 +157,42 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
     try {
       while (queue.length) {
         const m = queue.shift()!
-        await processMessage(messageText(m))
+        await processMessage(m)
       }
     } finally {
       processing = false
     }
   }
 
-  async function processMessage(text: string): Promise<void> {
+  async function processMessage(m: WAMessage): Promise<void> {
+    const caption = messageText(m)
     try {
-      const memContext = await buildMemoryContext(ownerNumber, text)
-      const message = memContext ? `${memContext}\n${text}` : text
+      let userText = caption
+      const media = extractMedia(m)
+      if (media) {
+        // Download once (the queue serialises this, so no concurrent socket use),
+        // file it into the vault, and turn it into a fragment the agent can act on.
+        await sock?.sendPresenceUpdate('composing', chatJid)
+        try {
+          const buffer = await downloadMediaMessage(
+            m, 'buffer', {},
+            { logger, reuploadRequest: sock!.updateMediaMessage },
+          ) as Buffer
+          const ing = await ingestAttachment({
+            channel: 'whatsapp', chatId: ownerNumber, fileBuffer: buffer,
+            mime: media.mime, filename: media.filename, caption: caption || undefined,
+            isPtt: media.isPtt, transcribe,
+          })
+          userText = ing.promptFragment
+        } catch (err) {
+          logger.error({ err }, 'whatsapp media ingest failed')
+          userText = caption || '(the user sent a file but it could not be downloaded)'
+        }
+      }
+      if (!userText.trim()) return
+
+      const memContext = await buildMemoryContext(ownerNumber, userText)
+      const message = memContext ? `${memContext}\n${userText}` : userText
       const sessionId = getSession(ownerNumber)
       await sock?.sendPresenceUpdate('composing', chatJid)
       const result = await runAgent(message, sessionId)
@@ -156,7 +200,7 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
         setSession(ownerNumber, result.newSessionId)
       }
       const out = result.text || '(no response)'
-      await saveConversationTurn(ownerNumber, text, out)
+      await saveConversationTurn(ownerNumber, userText, out)
       await reply(out)
     } catch (err) {
       logger.error({ err }, 'whatsapp handleMessage failed')
