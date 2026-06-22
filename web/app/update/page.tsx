@@ -7,16 +7,19 @@ const UPDATE_PROMPT = `I already have NelloClaw installed on this machine and I 
 
 First, cd into my existing install folder - the one that has my .env, bundle.json and template/ in it. If you are not already there, find it and move into it. If you cannot find a folder with those three things, stop and ask me where it is. Do not guess.
 
-Once you are in the right folder, read UPDATE_GUIDE.md from the repo and follow it step by step. The short version of what I want:
+Once you are in the right folder, here is what I want:
 
-1. Back up my .env, bundle.json and .mcp.json first (timestamped copies).
+1. Back up my .env, bundle.json, .mcp.json AND CLAUDE.md first (timestamped copies). CLAUDE.md is regenerated during the update, so back it up in case I made any hand edits.
 2. Stop the background app so nothing runs mid-update.
-3. Pull the latest code from the repo and rebuild it.
-4. If I am still on the old Google sign-in setup, move me over to the Composio Tool Router. That is the new one-key connection layer. It needs a single key from dashboard.composio.dev (it starts with "ak_"). Ask me for that key when you need it - it is the only thing I should have to paste. One key connects Gmail, Calendar, Drive and the rest. Remove the old Google sign-in entries and wire Composio in their place.
-5. Refresh the assistant and re-link the skills so I get the newest persona and tools.
-6. Restart the background app and verify everything is healthy.
+3. Pull the latest code from the repo and rebuild it. Do this BEFORE you read the update guide, so you follow the newest UPDATE_GUIDE.md and not my old local copy.
+4. Now read UPDATE_GUIDE.md from the repo (it is current after the pull) and follow it step by step for the rest.
+5. If I am still on the old Google sign-in setup, move me over to the Composio Tool Router. It needs a single key from dashboard.composio.dev (it starts with "ak_"). Ask me for that key when you need it - it is the only thing I should have to paste. One key connects Gmail, Calendar, Drive and the rest. Remove the old Google sign-in entries and wire Composio in their place.
+6. Refresh the assistant and re-link the skills so I get the newest persona and tools.
+7. Restart the background app and verify everything is healthy.
 
 Keep all my notes, my Memory, my Journal, my saved answers and my identity exactly as they are. None of that gets re-collected or wiped. Only the code, configs, skills and persona get refreshed.
+
+If "/update" is not a recognised command, that is expected - older installs do not have it yet, and this prompt does not need it (the pull in step 3 adds it for next time). If this folder turns out not to be a git checkout, do not force anything - tell me, and we will do a fresh install in a new folder and copy my vault, .env and bundle.json across.
 
 Confirm with me before anything destructive, and show me your plan before you start.`
 

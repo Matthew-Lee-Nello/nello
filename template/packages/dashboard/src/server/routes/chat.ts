@@ -197,6 +197,9 @@ export function chatRouter(): Router {
     const chatId = req.params.id
     const text: string = req.body?.text ?? ''
     if (!text.trim()) { res.status(400).json({ error: 'empty message' }); return }
+    // Cap absurd payloads (1MB ~ 250k tokens, already beyond context). Generous
+    // enough for any real transcript paste; stops a runaway body.
+    if (text.length > 1_000_000) { res.status(413).json({ error: 'message too large' }); return }
 
     const chatRow = getDb().prepare('SELECT id, name FROM dashboard_chats WHERE id = ? AND archived_at IS NULL').get(chatId) as { id: string; name: string } | undefined
     if (!chatRow) { res.status(404).json({ error: `chat not found: ${chatId}. POST /api/chat first to create one.` }); return }

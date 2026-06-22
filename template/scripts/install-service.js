@@ -44,6 +44,12 @@ if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(LABEL)) {
 }
 
 const NODE = process.execPath
+// The dir holding the node binary that ran this installer. Prepended to the
+// service PATH so a daemon child that spawns `node`/`npm`/`npx` by name resolves
+// it - critical for nvm/fnm/volta users whose node lives outside the standard
+// /usr/local|/opt/homebrew bins (otherwise hooks + voice features fail "command
+// not found"). The daemon itself launches via the absolute NODE above regardless.
+const NODE_BIN = dirname(NODE)
 // Daemon entry compiled to template/dist/index.js (the @nc/template package
 // builds into its own dist/, not the install root). Don't change without also
 // fixing template/package.json's build output path.
@@ -83,7 +89,7 @@ function installMac() {
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin</string>
+        <string>${NODE_BIN}:/opt/homebrew/bin:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin</string>
         <key>HOME</key>
         <string>${homedir()}</string>
         <key>NC_INSTALL_PATH</key>
@@ -179,6 +185,7 @@ ExecStart=${NODE} ${ENTRY}
 WorkingDirectory=${INSTALL}
 Environment=NC_INSTALL_PATH=${INSTALL}
 Environment=NC_VAULT_PATH=${VAULT}
+Environment=PATH=${NODE_BIN}:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin
 Restart=always
 RestartSec=5
 StandardOutput=append:${INSTALL}/store/server.log

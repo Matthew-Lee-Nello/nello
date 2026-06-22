@@ -68,7 +68,10 @@ function tokenMatches(provided: string | null): boolean {
 export function startDashboard(): DashboardHandle {
   const app = express()
   app.use(cors({ origin: ALLOWED_DASHBOARD_ORIGINS }))
-  app.use(express.json({ limit: '200mb' }))
+  // 25mb is generous for any JSON body (file uploads go through multipart, not
+  // here); 200mb was an unbounded-memory footgun. Per-message text is capped in
+  // the chat route too.
+  app.use(express.json({ limit: '25mb' }))
 
   // Token gate. Mounted BEFORE the API routers AND express.static so an
   // unauthed device gets 401 on both an API call and the SPA shell ('/'),
@@ -169,7 +172,11 @@ export function startDashboard(): DashboardHandle {
       const err = e.fields.err as { message?: unknown; name?: unknown }
       const m = typeof err.message === 'string' ? err.message : ''
       // First line only, length-capped, no stack and no file paths.
-      safe.errType = (typeof err.name === 'string' ? err.name + ': ' : '') + m.split('\n')[0].slice(0, 120)
+      // First line only, secrets/URLs/long-tokens scrubbed before it streams to
+      // any subscribed browser tab.
+      const firstLine = m.split('\n')[0].slice(0, 200)
+        .replace(/(bearer\s+\S+|sk-\S+|ak_\S+|https?:\/\/\S+|[A-Za-z0-9_-]{32,})/gi, '[redacted]')
+      safe.errType = (typeof err.name === 'string' ? err.name + ': ' : '') + firstLine.slice(0, 120)
     }
     broadcastLog(e.level, e.msg, safe, e.ts)
   })
@@ -187,8 +194,11 @@ export function startDashboard(): DashboardHandle {
         actualPort = next
         tryListen(next)
       } else {
-        logger.error({ err, port }, 'dashboard listen failed')
-        throw err
+        // Non-fatal: keep the daemon (and the messaging bots) alive even if the
+        // web UI can't bind - better than killing everything or, worse, running
+        // while pretending to be healthy. Logged loudly so server.log +
+        // install-doctor surface it.
+        logger.error({ err, port }, `dashboard could not bind a port (tried ${DASHBOARD_PORT}-${port}); web UI disabled, bots still running. Free the port or set DASHBOARD_PORT and restart.`)
       }
     })
     // Bind to loopback only. The daemon + dashboard chat route run with

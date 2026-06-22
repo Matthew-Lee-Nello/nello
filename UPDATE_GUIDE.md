@@ -34,7 +34,7 @@ cp bundle.json.bak-$(date +%Y%m%d) bundle.json
 [ -f .mcp.json.bak-$(date +%Y%m%d) ] && cp .mcp.json.bak-$(date +%Y%m%d) .mcp.json
 pnpm install && pnpm -r build
 ```
-Then restart the daemon (Step 6) and tell Matt the exact error you saw. Do not leave the install half-migrated.
+Then restart the daemon (Step 6) and tell the user the exact error you saw. Do not leave the install half-migrated.
 
 ## Step 1 - Stop the daemon
 
@@ -97,7 +97,7 @@ It does these automatically:
 - regenerates `.mcp.json` + `claude_desktop_config.json` with the `composio` entry, and **prunes the old `google_workspace` / `workspace-mcp` entry** (so it stops asking for Google OAuth),
 - preserves any MCP server the client added themselves.
 
-If the Composio mint fails (a network blip or a bad key - you'll see a "Composio session create failed" error and bootstrap stops), nothing is broken: `.env` still has the old keys removed and the new key added. Re-check the key is a valid `ak_...` from dashboard.composio.dev, confirm the machine is online, and re-run the same command. It only mints when `COMPOSIO_MCP_URL` is still empty, so re-running is safe. If it keeps failing, roll back (Step 0.5) and tell Matt.
+If the Composio mint fails (a network blip or a bad key - you'll see a "Composio session create failed" error and bootstrap stops), nothing is broken: `.env` still has the old keys removed and the new key added. Re-check the key is a valid `ak_...` from dashboard.composio.dev, confirm the machine is online, and re-run the same command. It only mints when `COMPOSIO_MCP_URL` is still empty, so re-running is safe. If it keeps failing, roll back (Step 0.5) and tell the user.
 
 The full run is safe to re-run: it skips the vault if it exists, preserves `.env`, merges MCP configs (keeping any client-added servers), and re-symlinks skills. Always use the full run for an update - it is what gives the user the new Composio persona, the new skills, and the Google-OAuth prune in one pass.
 
