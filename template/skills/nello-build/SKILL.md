@@ -291,7 +291,7 @@ Watch it when you're ready to scale past your inbox into the whole business.
 
 ### Stuck?
 
-DM `mattlee.nello` on Instagram if you hit a wall.
+Tell your assistant exactly what you're seeing and it'll walk you through the fix. That's what it's for.
 
 That's it. You've got an AI COO running on your machine, five workflows wired, your first custom skill scheduled, and a path to the company brain when you're ready.
 

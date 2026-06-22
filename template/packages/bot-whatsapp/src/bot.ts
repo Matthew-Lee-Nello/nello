@@ -33,6 +33,9 @@ const SENT_IDS_CAP = 1000
 export interface WhatsAppBot {
   start(): Promise<void>
   stop(): Promise<void>
+  // Proactive send (scheduler / morning brief). Owner-locked, so the chatId is
+  // ignored - delivery always goes to the owner's self-chat console.
+  send(chatId: string, text: string): Promise<void>
 }
 
 /**
@@ -224,5 +227,8 @@ export function createWhatsAppBot(opts: { ownerNumber?: string; sessionDir?: str
       try { sock?.end(undefined) } catch {}
       sock = null
     },
+    // Owner-locked: chatId is ignored, reply() targets the owner's self-chat and
+    // carries the same echo guard so a proactive message never re-enters as a prompt.
+    async send(_chatId: string, text: string) { await reply(text) },
   }
 }

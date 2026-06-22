@@ -31,7 +31,7 @@ import {
   type WASocket,
 } from '@whiskeysockets/baileys'
 import QRCode from 'qrcode'
-import { mkdirSync, readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, existsSync, appendFileSync, chmodSync } from 'node:fs'
 import { join } from 'node:path'
 import { WHATSAPP_SESSION_DIR, PROJECT_ROOT, STORE_DIR } from '@nc/core'
 
@@ -133,6 +133,7 @@ async function connect(): Promise<void> {
       // (open / start / xdg-open) if a text scan ever fails. Same <ts> as above.
       try {
         await QRCode.toFile(QR_PNG, qr, { width: 380, margin: 2 })
+        try { chmodSync(QR_PNG, 0o600) } catch { /* best-effort; transient pairing image */ }
         emit(`LINK_QR_READY ${QR_PNG} ${ts}`)
       } catch (e) {
         emit(`LINK_FAIL qr png write failed: ${(e as Error).message}`)

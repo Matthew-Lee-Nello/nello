@@ -88,13 +88,6 @@ async function main() {
       // TTS not wired in online mode. Install @nc/voice-local for Piper TTS.
     })
     registerTelegramBot(bot)
-
-    const sender = async (chatId: string, text: string) => {
-      if (!bot) return
-      try { await bot.api.sendMessage(chatId, text) } catch (err) { logger.error({ err }, 'send failed') }
-    }
-
-    initScheduler(sender)
     logger.info({ chats: ALLOWED_CHAT_IDS.length }, 'Telegram bot starting')
 
     // Background restart loop. Don't await - it never resolves while paused
@@ -162,6 +155,18 @@ async function main() {
     logger.warn('WhatsApp selected but WHATSAPP_OWNER_NUMBER empty - run /connect-whatsapp to link your phone')
   }
 
+  // Scheduler (morning brief, auto-fetch) on whichever channel is live. This used
+  // to sit inside the Telegram block, so a WhatsApp install got NO scheduled pushes
+  // and the failure was silent. Route it to the active channel's sender; if neither
+  // bot is up (dashboard-only), skip with a clear log.
+  const schedulerSend = bot
+    ? async (chatId: string, text: string) => { try { await bot!.api.sendMessage(chatId, text) } catch (err) { logger.error({ err }, 'scheduler send failed') } }
+    : waBot
+      ? async (_chatId: string, text: string) => { try { await waBot!.send(_chatId, text) } catch (err) { logger.error({ err }, 'scheduler send failed') } }
+      : null
+  if (schedulerSend) initScheduler(schedulerSend)
+  else logger.warn('no messaging channel active - scheduler not started (dashboard-only)')
+
   // Shutdown
   const shutdown = async () => {
     logger.info('shutting down')
@@ -177,9 +182,18 @@ async function main() {
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
   process.on('uncaughtException', (err) => {
-    logger.error({ err }, 'uncaught exception')
+    // Process state is undefined after an uncaught throw - don't keep running
+    // wedged (the service manager would think we're healthy and never restart).
+    // Exit and let launchd/systemd/schtasks relaunch clean; their restart
+    // throttle prevents a tight crash loop.
+    logger.error({ err }, 'uncaught exception - exiting for a clean service restart')
+    try { releaseLock() } catch { /* ignore */ }
+    process.exit(1)
   })
   process.on('unhandledRejection', (err) => {
+    // Log only: many rejections are benign (a fire-and-forget that failed), and
+    // exiting on every one would crash-loop the daemon. uncaughtException above
+    // is the real "corrupt state" signal.
     logger.error({ err }, 'unhandled rejection')
   })
 }

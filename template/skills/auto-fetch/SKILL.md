@@ -10,7 +10,7 @@ One global tick across every active connection. Runs on a 20-minute cron by defa
 
 ## Why this exists
 
-Peter shouldn't have to ask "what's new in my inbox?" — the system should already have read it, classified it, and dropped the highlights into the vault by the time he opens it. This skill is the worker that walks the connections.
+The user shouldn't have to ask "what's new in my inbox?" - the system should already have read it, classified it, and dropped the highlights into the vault by the time they open it. This skill is the worker that walks the connections.
 
 ## When this fires
 
