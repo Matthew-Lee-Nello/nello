@@ -17,17 +17,37 @@ const ENDPOINT = 'https://backend.composio.dev/api/v3.1/tool_router/session'
 export async function provisionRouterUrl(apiKey, userId) {
   if (!apiKey) throw new Error('COMPOSIO_API_KEY required')
   if (!userId) throw new Error('user_id required')
-  const res = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user_id: userId,
-      manage_connections: { enable: true },
-      tags: { disable: ['destructiveHint'] }, // blocks every delete/trash tool, all apps
-    }),
-  })
+
+  // Bound the call so a slow/hung Composio backend can't hang the installer
+  // forever (the user would see a dead spinner and force-kill mid-install).
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 30_000)
+  let res
+  try {
+    res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        manage_connections: { enable: true },
+        tags: { disable: ['destructiveHint'] }, // blocks every delete/trash tool, all apps
+      }),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw new Error('Composio provisioning timed out after 30s. Check your network and run the installer again.')
+    throw new Error(`Could not reach Composio (${err?.message || err}). Check your network and try again.`)
+  } finally {
+    clearTimeout(timer)
+  }
+
   const text = await res.text()
-  if (!res.ok) throw new Error(`Composio session create failed: ${res.status} ${text}`)
+  if (!res.ok) {
+    // Classified so the user knows whether it's their key, Composio, or the network.
+    if (res.status === 401 || res.status === 403) throw new Error('Composio rejected the API key (401/403). Double-check it at dashboard.composio.dev and re-run.')
+    if (res.status >= 500) throw new Error(`Composio is temporarily unavailable (${res.status}). Try again in a few minutes.`)
+    throw new Error(`Composio session create failed: ${res.status} ${text.slice(0, 200)}`)
+  }
   const data = JSON.parse(text)
   const url = data?.mcp?.url || data?.mcp_url || data?.url
   if (!url) throw new Error(`Composio session response had no mcp url: ${text.slice(0, 200)}`)

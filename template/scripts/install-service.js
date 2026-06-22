@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Cross-platform service installer.
- * Mac:   launchctl + plist
- * Win:   Task Scheduler + schtasks
- * Linux: systemd user service
+ * Mac:   launchctl + plist (RunAtLoad + KeepAlive = boot start + crash restart)
+ * Win:   Startup-folder shortcut (login start) + schtasks watchdog (crash restart)
+ * Linux: systemd user service (Restart=always)
  *
  * Reads NC_INSTALL_PATH + NC_LAUNCHAGENT_LABEL from env.
  * Idempotent - safe to rerun.
@@ -133,9 +133,10 @@ function installWindows() {
     `"${NODE}" "${ENTRY}" >> "${logFile}" 2>&1\r\n`
   writeFileSync(wrapper, wrapperContent)
 
-  // Wipe any stale schtasks entry from previous installs (safe if it doesn't exist).
+  // Wipe any stale schtasks entries from previous installs (safe if absent).
   // argv form so LABEL is never re-interpreted by cmd.exe quoting.
   spawnSync('schtasks', ['/Delete', '/F', '/TN', LABEL], { stdio: 'ignore' })
+  spawnSync('schtasks', ['/Delete', '/F', '/TN', `${LABEL}-watchdog`], { stdio: 'ignore' })
 
   // Drop the startup-folder .lnk. WScript.Shell COM via PowerShell - same
   // pattern as createWindowsShortcuts in bootstrap.js.
@@ -168,6 +169,32 @@ function installWindows() {
     ok('daemon started in background')
   } catch {
     ok(`daemon will start on next login (run "${wrapper}" to launch now)`)
+  }
+
+  // Crash-restart watchdog. The Startup .lnk only covers login; a daemon that
+  // dies mid-session would otherwise stay down until the next logout/login.
+  // This task fires every 5 min and relaunches only when the recorded PID is
+  // gone (and acquireLock makes a redundant launch a clean no-op anyway, so a
+  // missed check is harmless). Best-effort: a schtasks quirk must never fail
+  // the whole install.
+  try {
+    const watchdog = join(INSTALL, 'nello-claw-watchdog.cmd')
+    const watchdogContent =
+      `@echo off\r\n` +
+      `rem nello-claw watchdog (auto-generated). Relaunches the daemon if its PID is gone.\r\n` +
+      `set "PIDFILE=${join(storeDir, 'clawd.pid')}"\r\n` +
+      `if not exist "%PIDFILE%" goto launch\r\n` +
+      `set /p DPID=<"%PIDFILE%"\r\n` +
+      `tasklist /FI "PID eq %DPID%" 2>nul | find "%DPID%" >nul\r\n` +
+      `if not errorlevel 1 exit /b 0\r\n` +
+      `:launch\r\n` +
+      `start "" /min "${wrapper}"\r\n`
+    writeFileSync(watchdog, watchdogContent)
+    const w = spawnSync('schtasks', ['/Create', '/F', '/TN', `${LABEL}-watchdog`, '/TR', `"${watchdog}"`, '/SC', 'MINUTE', '/MO', '5', '/RL', 'LIMITED'], { stdio: 'ignore' })
+    if (w.status === 0) ok('crash-restart watchdog registered (every 5 min)')
+    else fail('watchdog registration skipped (login-start still active)')
+  } catch {
+    fail('watchdog registration skipped (login-start still active)')
   }
 }
 
