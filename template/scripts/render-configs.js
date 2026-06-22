@@ -16,7 +16,7 @@
  */
 
 // The Composio Tool Router URL for one client (minted per user by the provisioner,
-// scripts/composio-provision.py, with the `destructiveHint` tag disabled so the
+// scripts/composio-provision.mjs, with the `destructiveHint` tag disabled so the
 // agent can read/send/create across 1000+ apps but never delete or trash). The
 // agent sees ~6 meta-tools (search / execute / manage-connections) and pulls in
 // only what it needs, so the tool list stays tiny no matter how many apps connect.
@@ -30,7 +30,11 @@ export function renderMcpJson(ctx) {
   const env = ctx.env || {}
   const servers = {}
 
-  if (mcps.composio) {
+  // Only emit composio once it's actually provisioned. A blank url (provision
+  // skipped, or a --configs-only re-render before the URL was minted) yields an
+  // http server that silently fails to connect - so the agent believes Gmail is
+  // wired when it isn't. Gate on the URL being present.
+  if (mcps.composio && composioMcpUrl(env)) {
     servers.composio = {
       type: 'http',
       url: composioMcpUrl(env),
@@ -66,7 +70,11 @@ export function renderClaudeDesktopConfig(ctx) {
   const env = ctx.env || {}
   const servers = {}
 
-  if (mcps.composio) {
+  // Only emit composio once it's actually provisioned. A blank url (provision
+  // skipped, or a --configs-only re-render before the URL was minted) yields an
+  // http server that silently fails to connect - so the agent believes Gmail is
+  // wired when it isn't. Gate on the URL being present.
+  if (mcps.composio && composioMcpUrl(env)) {
     servers.composio = {
       type: 'http',
       url: composioMcpUrl(env),
@@ -135,7 +143,7 @@ export function renderSettingsJson(ctx) {
         {
           matcher: 'Bash',
           hooks: [
-            { type: 'command', command: `${installPath}/template/hooks/block-dangerous-git.sh` },
+            { type: 'command', command: `node "${installPath}/template/hooks/block-dangerous-git.js"` },
           ],
         },
       ],
