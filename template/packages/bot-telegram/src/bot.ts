@@ -4,7 +4,7 @@ import {
   getSession, setSession, clearSession,
   buildMemoryContext, saveConversationTurn,
   runAgent,
-  logger,
+  logger, ingestAttachment,
 } from '@nc/core'
 import { formatForTelegram, splitMessage } from './format.js'
 
@@ -119,37 +119,61 @@ export function createBot(deps: BotDeps = {}): Bot {
     await handleMessage(ctx, ctx.message.text)
   })
 
-  bot.on('message:voice', async (ctx) => {
-    if (!deps.transcribeAudio || !deps.downloadMedia) {
-      await ctx.reply('Voice transcription not installed.')
-      return
+  // One path for every media kind: download → file into the vault (transcribing
+  // voice) → hand the agent a fragment. Mirrors the WhatsApp side via the shared
+  // ingestAttachment in @nc/core.
+  async function ingestAndHandle(
+    ctx: Context,
+    fileId: string,
+    meta: { mime: string; filename?: string; isPtt?: boolean; caption?: string },
+  ): Promise<void> {
+    if (!deps.downloadMedia) { await ctx.reply('Media download is not wired on this install.'); return }
+    try {
+      await ctx.replyWithChatAction('typing')
+      const localPath = await deps.downloadMedia(fileId, meta.filename)
+      const ing = await ingestAttachment({
+        channel: 'telegram', chatId: String(ctx.chat?.id ?? ''), filePath: localPath,
+        mime: meta.mime, filename: meta.filename, caption: meta.caption,
+        isPtt: meta.isPtt, transcribe: deps.transcribeAudio,
+      })
+      await handleMessage(ctx, ing.promptFragment, meta.isPtt === true)
+    } catch (err) {
+      logger.error({ err }, 'telegram media ingest failed')
+      await ctx.reply(`Couldn't process that file: ${err instanceof Error ? err.message : String(err)}`)
     }
-    await ctx.replyWithChatAction('typing')
-    const localPath = await deps.downloadMedia(ctx.message.voice.file_id, 'voice.ogg')
-    const transcript = await deps.transcribeAudio(localPath)
-    await handleMessage(ctx, `[Voice transcribed]: ${transcript}`, true)
+  }
+
+  bot.on('message:voice', async (ctx) => {
+    await ingestAndHandle(ctx, ctx.message.voice.file_id, {
+      mime: ctx.message.voice.mime_type || 'audio/ogg', filename: 'voice.ogg', isPtt: true,
+    })
+  })
+
+  bot.on('message:audio', async (ctx) => {
+    const a = ctx.message.audio
+    await ingestAndHandle(ctx, a.file_id, {
+      mime: a.mime_type || 'audio/mpeg', filename: a.file_name || 'audio.mp3', caption: ctx.message.caption,
+    })
   })
 
   bot.on('message:photo', async (ctx) => {
-    if (!deps.downloadMedia) {
-      await ctx.reply('Media download not installed.')
-      return
-    }
     const photo = ctx.message.photo[ctx.message.photo.length - 1]
-    const localPath = await deps.downloadMedia(photo.file_id, 'photo.jpg')
-    const caption = ctx.message.caption ? `\nUser caption: ${ctx.message.caption}` : ''
-    await handleMessage(ctx, `[User sent a photo at ${localPath}]${caption}`)
+    await ingestAndHandle(ctx, photo.file_id, {
+      mime: 'image/jpeg', filename: 'photo.jpg', caption: ctx.message.caption,
+    })
   })
 
   bot.on('message:document', async (ctx) => {
-    if (!deps.downloadMedia) {
-      await ctx.reply('Media download not installed.')
-      return
-    }
     const doc = ctx.message.document
-    const localPath = await deps.downloadMedia(doc.file_id, doc.file_name)
-    const caption = ctx.message.caption ? `\nUser caption: ${ctx.message.caption}` : ''
-    await handleMessage(ctx, `[User sent document ${doc.file_name ?? 'file'} at ${localPath}]${caption}`)
+    await ingestAndHandle(ctx, doc.file_id, {
+      mime: doc.mime_type || 'application/octet-stream', filename: doc.file_name, caption: ctx.message.caption,
+    })
+  })
+
+  bot.on('message:video', async (ctx) => {
+    await ingestAndHandle(ctx, ctx.message.video.file_id, {
+      mime: ctx.message.video.mime_type || 'video/mp4', filename: 'video.mp4', caption: ctx.message.caption,
+    })
   })
 
   bot.catch(err => {

@@ -3,7 +3,7 @@
  * Runs the Telegram bot, scheduler, and dashboard under a single process.
  */
 
-import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'node:fs'
+import { writeFileSync, existsSync, readFileSync, unlinkSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   initDatabase, runDecaySweep, logger, PROJECT_ROOT, STORE_DIR,
@@ -16,8 +16,37 @@ import { createWhatsAppBot } from '@nc/bot-whatsapp'
 import { initScheduler, stopScheduler } from '@nc/scheduler'
 import { startDashboard } from '@nc/dashboard/server'
 import * as voiceOnline from '@nc/voice-online'
+import * as voiceLocal from '@nc/voice-local'
 
 const PID_FILE = join(STORE_DIR, 'clawd.pid')
+
+// Pick a voice transcriber from what's actually installed: local mlx-whisper /
+// whisper-cpp first (private, no key), then Groq (if GROQ_API_KEY is set). Returns
+// undefined if neither is available - the bots then reply a clear "voice isn't set
+// up" instead of crashing.
+function resolveTranscriber(): ((path: string) => Promise<string>) | undefined {
+  try { if (voiceLocal.voiceCapabilities().stt) { logger.info('voice: local whisper'); return voiceLocal.transcribeAudio } } catch { /* ignore */ }
+  try { if (voiceOnline.voiceCapabilities().stt) { logger.info('voice: Groq'); return voiceOnline.transcribeAudio } } catch { /* ignore */ }
+  logger.warn('voice: no transcriber available (install mlx-whisper/whisper-cpp or set GROQ_API_KEY)')
+  return undefined
+}
+
+// Download an inbound Telegram file to disk and return its path. Uses the Bot API
+// over HTTP directly (no bot instance needed): getFile -> file_path -> download.
+async function downloadTelegramMedia(fileId: string, originalName?: string): Promise<string> {
+  const metaRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`)
+  const meta = await metaRes.json() as { ok: boolean; result?: { file_path?: string } }
+  if (!meta.ok || !meta.result?.file_path) throw new Error(`telegram getFile failed: ${JSON.stringify(meta).slice(0, 200)}`)
+  const res = await fetch(`https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${meta.result.file_path}`)
+  if (!res.ok) throw new Error(`telegram file download failed: ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  const dir = join(STORE_DIR, 'uploads', 'telegram')
+  mkdirSync(dir, { recursive: true })
+  const safe = (originalName || 'file').replace(/[^\w.\-]/g, '_').slice(0, 80)
+  const path = join(dir, `${Date.now()}_${safe}`)
+  writeFileSync(path, buf)
+  return path
+}
 
 function acquireLock(): void {
   if (existsSync(PID_FILE)) {
@@ -65,6 +94,10 @@ async function main() {
   // even if a stale token were hand-pasted into .env. Legacy/empty = telegram.
   const telegramSelected = MESSAGING_CHANNEL !== 'whatsapp'
 
+  // Resolve a voice transcriber once (local whisper, else Groq, else none) - both
+  // bots use it for voice notes.
+  const transcribe = resolveTranscriber()
+
   // Discovery mode: no chat ID yet → wait for first Telegram message, capture, restart.
   if (telegramSelected && TELEGRAM_BOT_TOKEN && ALLOWED_CHAT_IDS.length === 0) {
     logger.info('chat ID missing - entering discovery mode')
@@ -84,7 +117,8 @@ async function main() {
   let bot: ReturnType<typeof createBot> | null = null
   if (telegramSelected && TELEGRAM_BOT_TOKEN && ALLOWED_CHAT_IDS.length > 0) {
     bot = createBot({
-      transcribeAudio: voiceOnline.transcribeAudio,
+      transcribeAudio: transcribe,
+      downloadMedia: downloadTelegramMedia,
       // TTS not wired in online mode. Install @nc/voice-local for Piper TTS.
     })
     registerTelegramBot(bot)
@@ -145,7 +179,7 @@ async function main() {
   const whatsappSelected = MESSAGING_CHANNEL !== 'telegram'
   let waBot: ReturnType<typeof createWhatsAppBot> | null = null
   if (whatsappSelected && WHATSAPP_OWNER_NUMBER) {
-    waBot = createWhatsAppBot()
+    waBot = createWhatsAppBot({ transcribe })
     registerWhatsAppBot(waBot)
     logger.info({ owner: WHATSAPP_OWNER_NUMBER }, 'WhatsApp bot starting')
     waBot.start()
