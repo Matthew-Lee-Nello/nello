@@ -261,7 +261,17 @@ function lockFile(p) {
   try {
     if (process.platform === 'win32') {
       const user = process.env.USERNAME || process.env.USER || ''
-      if (user) execSync(`icacls "${p}" /inheritance:r /grant:r "${user}:F"`, { stdio: 'ignore' })
+      if (!user) {
+        warn(`Could not identify the current user to lock ${p}. Secure it manually so other accounts on this PC can't read your keys.`)
+        return
+      }
+      try {
+        execSync(`icacls "${p}" /inheritance:r /grant:r "${user}:F"`, { stdio: 'ignore' })
+      } catch {
+        // Don't swallow: a failed lock leaves secrets readable by every account
+        // on the box, and the user would never know.
+        warn(`Could not lock ${p} via icacls - your keys may be readable by other Windows accounts. Secure it manually (Properties > Security) or move the install to an NTFS drive.`)
+      }
     } else {
       chmodSync(p, 0o600)
     }

@@ -40,8 +40,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const apiKey = process.env.COMPOSIO_API_KEY
   provisionRouterUrl(apiKey, userId)
     .then(url => {
+      // Print only the minted URL. Never echo the API key - this runs standalone
+      // from the labs.nello.gg wizard, where stdout can be captured/logged.
       console.log(`COMPOSIO_MCP_URL=${url}`)
-      console.log(`COMPOSIO_API_KEY=${apiKey}`)
     })
     .catch(e => { console.error(e.message); process.exit(1) })
 }
