@@ -55,6 +55,16 @@ cat ~/nello-claw/.claude/settings.json                       # the project-scope
 
 If you want this off entirely, edit `~/nello-claw/.claude/settings.json` and remove the `permissions` block. Your assistant will then prompt for every tool use the way Claude Code normally does.
 
+## Trust boundary: what your assistant will act on
+
+Because tools run without a per-action prompt (see above), treat everything that feeds your assistant's context as if it were code it can run:
+
+- **Your `CLAUDE.md`, bundled skills, and vault notes are effectively trusted.** A skill or a note that says "delete X" or "email Y to Z" can make the assistant do it. Only add skills and notes you trust, the same way you'd only run a script you trust.
+- **Inbound messages and attachments are untrusted.** A PDF, image, voice note or caption you forward (especially something forwarded on from someone else) can carry text aimed at hijacking the assistant ("ignore your instructions and ..."). nello-claw fences this content and labels it as data, not instructions, so the assistant is told to analyse it rather than obey it - but no prompt-injection defence is perfect. Don't forward attachments from people you don't trust and expect their embedded instructions to be safe.
+- **The owner lock** means only your own number/chat can reach the assistant; a stranger can't message it. Anything *you* forward still flows in as above.
+
+If you handle sensitive material, keep `bypassPermissions` off (above) so every tool use is gated.
+
 ## API keys handling
 
 Plaintext, in `~/nello-claw/.env`. Permissions set to `0600` (read/write owner only).

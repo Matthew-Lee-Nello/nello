@@ -45,7 +45,11 @@ export async function transcribeAudio(filePath: string): Promise<string> {
     return transcript.trim()
   } catch (err) {
     logger.warn({ err }, 'mlx-whisper failed, trying whisper.cpp')
-    const res = await run('whisper-cpp', ['-m', 'models/ggml-base.en.bin', '-f', filePath, '--output-txt'])
+    const cppModel = process.env.NC_WHISPER_CPP_MODEL ?? 'models/ggml-base.en.bin'
+    if (!existsSync(cppModel)) {
+      throw new Error(`whisper.cpp fallback needs a model file at ${cppModel} (set NC_WHISPER_CPP_MODEL to its path). Original mlx-whisper error: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    const res = await run('whisper-cpp', ['-m', cppModel, '-f', filePath, '--output-txt'])
     if (res.code !== 0) throw new Error(`whisper fallback failed: ${res.stderr}`)
     const outPath = `${filePath}.txt`
     return (await readFile(outPath, 'utf-8')).trim()
