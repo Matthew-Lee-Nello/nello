@@ -23,6 +23,8 @@ claude_desktop_config.json
 brain-context.md
 .claude/
 vault/
+.wa-session/
+.serena/
 # Rendered-from-template files for local install runs (the .hbs is the source)
 /CLAUDE.md
 /AGENTS.md

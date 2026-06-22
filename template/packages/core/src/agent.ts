@@ -1,6 +1,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import { PROJECT_ROOT, TYPING_REFRESH_MS } from './config.js'
+import { PROJECT_ROOT, TYPING_REFRESH_MS, AGENT_SETTING_SOURCES } from './config.js'
 import { logger } from './logger.js'
+
+type SettingSource = 'user' | 'project' | 'local'
 
 export interface RunAgentResult {
   text: string | null
@@ -47,14 +49,19 @@ export async function runAgentStream(
     }, TYPING_REFRESH_MS)
   }
 
-  try {
+  // One pass of the SDK. `resume` is passed only when defined - a stale/invalid
+  // session id makes the bundled CLI exit 1 at startup, so the caller retries fresh.
+  async function attempt(resume: string | undefined): Promise<RunAgentResult> {
     const generator = query({
       prompt: message,
       options: {
         cwd: PROJECT_ROOT,
-        resume: sessionId,
-        settingSources: ['project', 'user'],
+        ...(resume ? { resume } : {}),
+        settingSources: AGENT_SETTING_SOURCES as SettingSource[],
         permissionMode: 'bypassPermissions',
+        // Surface the bundled CLI's own stderr so failures (e.g. "Prompt is too long")
+        // are diagnosable instead of a bare "exited with code 1".
+        stderr: (chunk: string) => { try { logger.debug({ claudeStderr: String(chunk).slice(0, 1200) }, 'claude stderr') } catch { /* ignore */ } },
       },
     })
 
@@ -100,6 +107,20 @@ export async function runAgentStream(
 
     onEvent?.({ type: 'done', text })
     return { text, newSessionId }
+  }
+
+  try {
+    try {
+      return await attempt(sessionId)
+    } catch (err) {
+      // A bad resume id is the most common startup failure. Retry ONCE from a fresh
+      // session so one stale id can't wedge the conversation forever.
+      if (sessionId) {
+        logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'agent failed with resume, retrying fresh')
+        return await attempt(undefined)
+      }
+      throw err
+    }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     onEvent?.({ type: 'error', error: errMsg })

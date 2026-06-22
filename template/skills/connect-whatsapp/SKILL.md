@@ -1,13 +1,13 @@
 ---
 name: connect-whatsapp
-description: Link WhatsApp to this install on the user's OWN number, using the "Message Yourself" self-chat as the assistant console. Runs a one-shot linker that renders the pairing QR as an image INSIDE this chat so the user scans it on the spot (Linked Devices -> Link a Device), auto-captures their number, then restarts the daemon and confirms with a test self-message. Also the way to SWITCH from Telegram to WhatsApp. Use when the user says "/connect-whatsapp", "connect whatsapp", "link whatsapp", "set up whatsapp", "switch to whatsapp", "use whatsapp instead", "whatsapp isn't working", "scan the whatsapp qr", "show me the qr".
+description: Link WhatsApp to this install on the user's OWN number, using the "Message Yourself" self-chat as the assistant console. Runs a one-shot linker that prints the pairing QR as a scannable code INSIDE this chat so the user scans it on the spot (Linked Devices -> Link a Device), auto-captures their number, then restarts the daemon and confirms with a test self-message. Also the way to SWITCH from Telegram to WhatsApp. Use when the user says "/connect-whatsapp", "connect whatsapp", "link whatsapp", "set up whatsapp", "switch to whatsapp", "use whatsapp instead", "whatsapp isn't working", "scan the whatsapp qr", "show me the qr".
 trigger: /connect-whatsapp
 model_hint: reasoning
 ---
 
 # /connect-whatsapp - link WhatsApp by scanning a QR right here
 
-One job: link this install to the user's WhatsApp on their own number and make the "Message Yourself" self-chat the assistant console. The QR shows up **as an image in this chat** - the user scans it with their phone and they're connected. Their number is captured automatically; they never type it.
+One job: link this install to the user's WhatsApp on their own number and make the "Message Yourself" self-chat the assistant console. The QR shows up **as a scannable code in this chat** - the user scans it with their phone and they're connected. Their number is captured automatically; they never type it.
 
 ## Prime directives (read before doing anything)
 
@@ -40,9 +40,13 @@ One job: link this install to the user's WhatsApp on their own number and make t
    ```
    (Use the Bash tool's background mode. The linker prints one-line sentinels to that log.)
 
-5. **Show the QR in this chat.** Poll `store/wa-link.log` for a line `LINK_QR_READY <png-path> <ts>`. When it appears, **Read the PNG at `<png-path>`** (it is `INSTALL/store/link-qr.png`) so it renders inline here. Tell the user: *"On your phone: WhatsApp -> Settings -> Linked Devices -> Link a Device -> point the camera at this code."*
+5. **Show the QR in this chat.** Poll `store/wa-link.log` for an ASCII QR block - everything between a `LINK_QR_ASCII_BEGIN <ts>` line and the matching `LINK_QR_ASCII_END <ts>` line. When it appears, **paste the lines between those two sentinels straight into the chat inside a fenced code block** (triple backticks), exactly as-is, so the user sees a scannable QR right here. Tell the user: *"On your phone: WhatsApp -> Settings -> Linked Devices -> Link a Device -> point the camera at this code."*
+   - **Fallback if they can't scan the text code** (a few phone cameras struggle with a small terminal QR): the log also has `LINK_QR_READY <png-path> <ts>` for a crisp PNG at `INSTALL/store/link-qr.png`. Open it in the native image viewer for their OS:
+     - Mac: `open store/link-qr.png`
+     - Windows: `start "" store\link-qr.png`
+     - Linux: `xdg-open store/link-qr.png`
 
-6. **Re-show on rotation.** The QR refreshes about every 20 seconds; each refresh writes a new `LINK_QR_READY` line with a newer `<ts>` and overwrites the same PNG. Each time you see a newer `<ts>`, Read the PNG again and say "here's a fresh code, scan this one". Keep going until you see `LINK_SUCCESS` or a terminal line.
+6. **Re-show on rotation.** The QR refreshes about every 20 seconds; each refresh writes a fresh `LINK_QR_ASCII_BEGIN/END` block (and a new `LINK_QR_READY` line) with a newer `<ts>`. Each time you see a newer `<ts>`, paste the new ASCII block and say "here's a fresh code, scan this one" (or re-open the PNG if you're using the image fallback). Keep going until you see `LINK_SUCCESS` or a terminal line.
    - If `LINK_SUCCESS` arrives with **no** QR ever shown, the device was already linked - skip the scan step.
 
 7. **Confirm the link.** Poll for `LINK_SUCCESS <number>`. Read back the captured number and verify it landed: `grep WHATSAPP_OWNER_NUMBER .env`.

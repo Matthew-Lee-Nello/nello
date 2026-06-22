@@ -151,11 +151,22 @@ Start them off by connecting `gmail` + `googlecalendar`; add the rest as needed.
 
 ## Step 8 - Seed the brain into the vault
 
-The persona in `CLAUDE.md` now carries their business. Make the vault match so search + the graph have something to stand on. Two ways to fill it - do both:
+The persona in `CLAUDE.md` now carries their business. Make the vault match so search + the graph have something to stand on.
 
-1. **From the interview.** From the Step 3 answers, write starter notes in the vault taxonomy (`nello` preset → `Person-`, `Client-`, `Project-` prefixes with `type`/`tags`/`date` frontmatter): one note per client, per team member, per active project. Keep them short - name, role/status, one or two facts. The auto-memory hook grows them over time.
+1. **From the interview (always do this).** From the Step 3 answers, write starter notes in the vault taxonomy (`nello` preset → `Person-`, `Client-`, `Project-` prefixes with `type`/`tags`/`date` frontmatter): one note per client, per team member, per active project. Keep them short - name, role/status, one or two facts. The auto-memory hook grows them over time.
 
-2. **From their ChatGPT history (optional, powerful).** Ask plainly: **"Have you got a ChatGPT export handy? If you do, just tell me where it is and I'll fold all of it into your brain."** If they don't have one, tell them how to get it: chatgpt.com → Settings → Data controls → Export data → they get an email → download the `.zip`. If they hand you anything - the `.zip`, an unzipped folder, or "it's in my Downloads" - run **`/build-brain`** on that path now. It parses every conversation, archives them, and mines out the people, clients, projects and preferences into the taxonomy (deduped, re-runnable). They can also run `/build-brain` any time later.
+2. **Seed the deeper history - let them pick.** The vault gets far richer if you fold in what they already have. Offer the choice plainly, in their words:
+
+   > "Want me to pull your real history in now? I can do it two ways - pick either, both, or skip for now:
+   > **(A) Connect your live tools** - Gmail, Calendar, Drive, Slack, Notion - and I'll backfill your history through them.
+   > **(B) Your ChatGPT export** - hand me the file and I'll fold every conversation in.
+   > **(C) Both.**
+   > **(D) Skip for now** - we can do it any time with `/build-brain`."
+
+   - **(A) or (C) - aggregate from live tools.** First make sure the tools are connected (Step 7 - "Connect my Gmail and Calendar", etc.), then run **`/build-brain aggregate`**. It sweeps each connected source from the beginning, archives everything, and mines out the people, clients, projects and preferences (deduped, resumable - it can finish in the background).
+   - **(B) or (C) - ChatGPT export.** Ask where the file is. If they don't have one: chatgpt.com → Settings → Data controls → Export data → they get an email → download the `.zip`. Hand the path (the `.zip`, an unzipped folder, or `conversations.json`) to **`/build-brain export <path>`**. It parses every conversation, archives them, and mines the same entities.
+   - **(C) - both.** Run **`/build-brain both`** (or just `/build-brain`) and it does the export then the live-tool backfill in one pass.
+   - **(D) - skip.** Note it and move on; `/build-brain` is always there later.
 
 ---
 
