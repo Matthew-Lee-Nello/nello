@@ -20,8 +20,8 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 ## 2. Env keys (mask values)
 - Read `.env`. List every `KEY=` line. Never print actual key values.
 - **Messaging channel:** read `MESSAGING_CHANNEL` (telegram / whatsapp; empty = legacy telegram). Report it - it decides which messaging checks apply below (§12).
-- Report `SET` / `MISSING` / `EMPTY` for: `COMPOSIO_API_KEY` (must start `ak_`), `COMPOSIO_MCP_URL` (the minted router URL - EMPTY means Composio provisioning failed at bootstrap), `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `VAULT_PATH`, `DASHBOARD_TOKEN`.
-- **`DASHBOARD_TOKEN` EMPTY = ✗** - the dashboard + its chat route run with bypassPermissions; an empty token is an open RCE surface. Must be SET.
+- Report `SET` / `MISSING` / `EMPTY` for: `COMPOSIO_API_KEY` (must start `ak_`), `COMPOSIO_MCP_URL` (the minted router URL - EMPTY means Composio provisioning failed at bootstrap), `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `VAULT_PATH`.
+- **`DASHBOARD_TOKEN` is OPTIONAL** - empty is fine and is the default (no ✗). The dashboard binds `127.0.0.1` (loopback-only) and has an Origin/CSRF guard, so a local install needs no token. Only set it if you expose the dashboard beyond localhost (Tailscale serve / a tunnel); setting it re-enables the auth gate.
 - **Pick-one integrity:** a `telegram` install should have `WHATSAPP_OWNER_NUMBER` empty (and a `whatsapp` install should have `TELEGRAM_BOT_TOKEN` empty). Both populated = ⚠ split-brain; the daemon runs only the chosen one, but clean up the stray.
 
 ## 3. Services (Mac launchd / Win schtasks / Linux systemd)
