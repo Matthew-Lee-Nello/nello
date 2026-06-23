@@ -115,13 +115,15 @@ async function connect(): Promise<void> {
         // Cast: the @types default-import resolves `.toString` to Object.prototype's
         // (0-arg) overload, but at runtime qrcode's own renderer shadows it.
         const qrToString = QRCode.toString as unknown as
-          (text: string, opts: { type: string; small?: boolean }) => Promise<string>
+          (text: string, opts: { type: string; small?: boolean; errorCorrectionLevel?: string }) => Promise<string>
         // `small` packs two QR rows per text line with half-block glyphs (▀▄█), so the
         // glyph SHAPES carry the whole code. The renderer also wraps each line in ANSI
         // colour codes (black-on-white) for a real terminal - strip them, because a
         // markdown chat pane shows raw escape codes as garbage and breaks the scan.
         // eslint-disable-next-line no-control-regex
-        const ascii = (await qrToString(qr, { type: 'terminal', small: true }))
+        // errorCorrectionLevel 'L' = fewest modules (WhatsApp scans fine with L),
+        // so the ASCII block is small enough to not wrap in a chat pane.
+        const ascii = (await qrToString(qr, { type: 'terminal', small: true, errorCorrectionLevel: 'L' }))
           .replace(/\x1b\[[0-9;]*m/g, '')
         emit(`LINK_QR_ASCII_BEGIN ${ts}`)
         process.stdout.write(ascii.endsWith('\n') ? ascii : ascii + '\n')
