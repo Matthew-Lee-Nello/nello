@@ -228,6 +228,33 @@ export function clearMemories(chatId: string): number {
   return getDb().prepare('DELETE FROM memories WHERE chat_id = ?').run(chatId).changes
 }
 
+// All memories for a chat in chronological order (oldest first) - the transcript
+// proxy used by /compact. Optionally filter by sector.
+export function getChatMemories(chatId: string, sector?: 'semantic' | 'episodic'): Memory[] {
+  if (sector) {
+    return getDb().prepare(
+      'SELECT * FROM memories WHERE chat_id = ? AND sector = ? ORDER BY created_at ASC'
+    ).all(chatId, sector) as Memory[]
+  }
+  return getDb().prepare(
+    'SELECT * FROM memories WHERE chat_id = ? ORDER BY created_at ASC'
+  ).all(chatId) as Memory[]
+}
+
+// Count of memories stored for a chat (used in the /new confirmation).
+export function getMemoryCount(chatId: string): number {
+  const row = getDb().prepare('SELECT COUNT(*) AS c FROM memories WHERE chat_id = ?').get(chatId) as { c: number }
+  return row.c
+}
+
+// Trim a chat's episodic turns (the raw chatter) after /compact has summarised
+// them into a durable semantic memory. Returns the number of rows removed.
+export function deleteEpisodicMemories(chatId: string): number {
+  return getDb().prepare(
+    "DELETE FROM memories WHERE chat_id = ? AND sector = 'episodic'"
+  ).run(chatId).changes
+}
+
 // ---------- Scheduled tasks ----------
 
 export interface Task {

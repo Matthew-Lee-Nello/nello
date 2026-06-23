@@ -17,7 +17,7 @@ import {
   WHATSAPP_OWNER_NUMBER, WHATSAPP_SESSION_DIR, MAX_MESSAGE_LENGTH,
   getSession, setSession, clearSession,
   buildMemoryContext, saveConversationTurn,
-  runAgent, logger, ingestAttachment,
+  runAgent, handleSlashCommand, logger, ingestAttachment,
 } from '@nc/core'
 import { formatForWhatsApp, splitMessage } from './format.js'
 
@@ -190,6 +190,11 @@ export function createWhatsAppBot(
         }
       }
       if (!userText.trim()) return
+
+      // Slash commands (/new, /compact, /help). Owner-locked above, so the
+      // sender is already authorised.
+      const slashReply = await handleSlashCommand(ownerNumber, userText)
+      if (slashReply !== null) { await reply(slashReply); return }
 
       const memContext = await buildMemoryContext(ownerNumber, userText)
       const message = memContext ? `${memContext}\n${userText}` : userText
