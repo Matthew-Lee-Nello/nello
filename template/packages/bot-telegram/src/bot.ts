@@ -1,9 +1,9 @@
 import { Bot, type Context } from 'grammy'
 import {
   ALLOWED_CHAT_IDS, TELEGRAM_BOT_TOKEN, MAX_MESSAGE_LENGTH,
-  getSession, setSession, clearSession,
+  getSession, setSession,
   buildMemoryContext, saveConversationTurn,
-  runAgent,
+  runAgent, cmdNew, cmdCompact, cmdHelp,
   logger, ingestAttachment,
 } from '@nc/core'
 import { formatForTelegram, splitMessage } from './format.js'
@@ -28,6 +28,15 @@ export function createBot(deps: BotDeps = {}): Bot {
 
   const bot = new Bot(TELEGRAM_BOT_TOKEN)
   const voiceMode = new Set<string>()   // chat IDs with voice reply enabled
+
+  // Register the command menu so /new + /compact appear in Telegram's UI.
+  bot.api.setMyCommands([
+    { command: 'new', description: 'Start a fresh chat (new session, clears this chat memory)' },
+    { command: 'compact', description: 'Summarise this conversation + reset context' },
+    { command: 'voice', description: 'Toggle voice replies' },
+    { command: 'chatid', description: 'Show your chat ID' },
+    { command: 'help', description: 'List commands' },
+  ]).catch((err: unknown) => logger.warn({ err }, 'setMyCommands failed (non-fatal)'))
 
   function isAuthorised(chatId: number | string): boolean {
     const id = String(chatId)
@@ -98,10 +107,32 @@ export function createBot(deps: BotDeps = {}): Bot {
     await ctx.reply(`Your chat ID: ${ctx.chat?.id}`)
   })
 
+  // /new - canonical fresh-chat command. Gated (destructive memory wipe).
+  bot.command('new', async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? '')
+    if (!isAuthorised(chatId)) { await ctx.reply('Not authorised.'); return }
+    await ctx.reply(await cmdNew(chatId))
+  })
+
+  // /newchat - alias of /new (was session-only + ungated; now full + gated).
   bot.command('newchat', async (ctx) => {
     const chatId = String(ctx.chat?.id ?? '')
-    clearSession(chatId)
-    await ctx.reply('Session cleared. Fresh context next message.')
+    if (!isAuthorised(chatId)) { await ctx.reply('Not authorised.'); return }
+    await ctx.reply(await cmdNew(chatId))
+  })
+
+  // /compact - summarise the conversation + reset the context window. Gated.
+  bot.command('compact', async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? '')
+    if (!isAuthorised(chatId)) { await ctx.reply('Not authorised.'); return }
+    await ctx.reply(await cmdCompact(chatId))
+  })
+
+  // /help - list commands.
+  bot.command('help', async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? '')
+    if (!isAuthorised(chatId)) { await ctx.reply('Not authorised.'); return }
+    await ctx.reply(cmdHelp())
   })
 
   bot.command('voice', async (ctx) => {
