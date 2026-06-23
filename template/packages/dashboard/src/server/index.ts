@@ -28,9 +28,12 @@ export { sendToChat, broadcastLog } from './ws-broadcast.js'
 // guard below, which rejects state-changing requests from any other browser
 // origin (e.g. evil.example pointing fetch() at http://localhost:3000).
 const ALLOWED_DASHBOARD_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
+  // Track the actual configured port, not a hardcoded 3000. A client install on
+  // any other DASHBOARD_PORT (e.g. 3100) was getting 403 "origin not allowed" on
+  // every POST because its own Origin wasn't in this list.
+  `http://localhost:${DASHBOARD_PORT}`,
+  `http://127.0.0.1:${DASHBOARD_PORT}`,
+  'http://localhost:5173',   // vite dev server
   'http://127.0.0.1:5173',
 ]
 
