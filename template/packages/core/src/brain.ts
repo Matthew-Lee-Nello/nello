@@ -39,7 +39,11 @@ export function gbrainSearch(query: string, k = 4, timeoutMs = 4000): Promise<st
     try {
       execFile(
         GBRAIN_BIN,
-        ['query', query.slice(0, 500), '--no-expand'],
+        // --source-id default scopes recall to the client's vault (the 'default'
+        // source). Explicit + future-proof: if reference corpora are ever added as
+        // other gbrain sources, a no-source query could auto-nudge to one and
+        // pollute personal recall. Harmless when 'default' is the only source.
+        ['query', query.slice(0, 500), '--no-expand', '--source-id', 'default'],
         {
           timeout: timeoutMs,
           maxBuffer: 1024 * 1024,
