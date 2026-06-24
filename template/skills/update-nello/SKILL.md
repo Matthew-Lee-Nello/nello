@@ -1,13 +1,13 @@
 ---
 name: update-nello
-description: Update an existing nello-claw install to the latest version - pull the newest main, rebuild, refresh persona + skills + configs, and (only if the old wiring is still there) migrate Google OAuth onto the Composio Tool Router. Nothing personal is lost - vault, memory, identity and the Telegram owner lock are all preserved, there is NO re-interview. Use when the user says "/update", "update nello", "update my assistant", "update my install", "check for updates", "am I on the latest version", "pull the latest", "get the new skills", "migrate me to composio".
+description: Update an existing nello-claw install to the latest version - pull the newest main, rebuild, refresh persona + skills + configs, run any pending stack migrations automatically (e.g. the old Google OAuth -> Composio move), and prompt only for a key that a newly added tool needs. Nothing personal is lost - vault, memory, identity and the Telegram owner lock are all preserved, there is NO re-interview. Use when the user says "/update", "update nello", "update my assistant", "update my install", "check for updates", "am I on the latest version", "pull the latest", "get the new skills", "migrate me to composio".
 trigger: /update
 model_hint: reasoning
 ---
 
 # /update - update this install to the latest
 
-One job: bring a clone up to the newest `main`, rebuild, re-render the configs/persona/skills, and migrate the old Google OAuth wiring onto Composio only if it is still present. The full canonical step list lives in `<install>/UPDATE_GUIDE.md` - read it and follow it exactly. This skill orchestrates and points there; it does not duplicate the detail.
+One job: bring a clone up to the newest `main`, rebuild, re-render the configs/persona/skills, run any pending stack migrations (the full bootstrap does this on its own - the old Google OAuth -> Composio move is now one of them), and prompt only for a key a newly added tool needs. The full canonical step list lives in `<install>/UPDATE_GUIDE.md` - read it and follow it exactly. This skill orchestrates and points there; it does not duplicate the detail.
 
 ## Prime directives (read before doing anything)
 
@@ -24,20 +24,19 @@ One job: bring a clone up to the newest `main`, rebuild, re-render the configs/p
 2. **Stop the daemon** so nothing runs mid-update (Step 1, OS-specific).
 3. **Pull latest main, fast-forward only.** `git fetch origin` then `git pull --ff-only origin main`. Updates always pull the newest `main`. If the pull is refused by local edits, show `git status` and ask - never force (Step 2).
 4. **Rebuild.** `pnpm install` then `pnpm -r build` (Step 3).
-5. **Migrate Google OAuth -> Composio ONLY if the old wiring is present** (Step 4). Detect it first:
-   ```bash
-   grep -qE 'GOOGLE_OAUTH_CLIENT_ID|GOOGLE_OAUTH_CLIENT_SECRET' .env && echo "OLD .env"
-   grep -q 'google_workspace\|workspace-mcp' .mcp.json 2>/dev/null && echo "OLD .mcp.json"
-   ```
-   If neither prints, this install is already on Composio - **skip the migration, it is a plain code refresh.** If the old wiring is there: ask the user for their Composio key (`ak_...` from dashboard.composio.dev - the only thing they paste), strip the `GOOGLE_OAUTH_*` lines from `.env` and add `COMPOSIO_API_KEY=ak_<theirs>` (keep `GOOGLE_USER_EMAIL` - it becomes their Composio user id), leave `COMPOSIO_MCP_URL` empty, and mirror the same change in `bundle.json` (`"composio": true`, drop any `"google": true`).
-6. **Refresh the install.** Run the full bootstrap so persona (`CLAUDE.md`) and skills re-link too:
+5. **Refresh the install - this is where the upgrade happens** (Guide Step 4). Run the full bootstrap:
    ```bash
    NC_INSTALL_PATH=$(pwd) node ./template/bootstrap.js
    ```
-   It reads the live `.env` (wins over `bundle.json`), mints the durable Composio Tool Router URL when the key is set and the URL is empty, regenerates `.mcp.json` + `claude_desktop_config.json` with the `composio` entry, **prunes the old `google_workspace` / `workspace-mcp` entry** so it stops asking for Google OAuth, and preserves any MCP the user added. Safe to re-run - it skips the existing vault and preserves `.env`. (For a configs-only pass without touching persona, the guide notes `--configs-only`.)
-7. **Restart the daemon** (Step 6, OS-specific).
-8. **Verify.** Run `/install-doctor`. Spot-check that `.mcp.json` has `composio`, no longer has `google_workspace`/`workspace-mcp`, and that `COMPOSIO_MCP_URL` got minted into `.env`. Open the dashboard - no Google OAuth prompt should appear (Step 7).
-9. **Reconnect apps, one click each.** The user says **"connect my Gmail"** (and Calendar, Drive, etc) in chat or Telegram; that calls `COMPOSIO_MANAGE_CONNECTIONS`, hands back a `connect.composio.dev` link, they click Allow. Read/send/create work; delete and trash stay blocked (Step 8).
+   It re-renders persona (`CLAUDE.md`) + re-links skills + regenerates `.mcp.json`/`claude_desktop_config.json`, **runs any pending stack migrations on its own** (each recorded once in `.nello-version`; the old Google OAuth -> Composio move is migration `0001` - it strips the dead `GOOGLE_OAUTH_*` secrets and flips the install onto Composio, no hand-editing), mints the Composio router URL when the key is present, prunes retired MCP entries, and preserves the vault + `.env` + any client-added MCP. Safe to re-run. (A same-version config re-sync uses `--configs-only`; never use that for a version update - it skips migrations + persona.)
+6. **Collect any new keys** (Guide Step 5). Ask bootstrap what's missing:
+   ```bash
+   node ./template/bootstrap.js --report-missing-keys
+   ```
+   `[]` = nothing to do, skip ahead. Otherwise, for each `{tool, key, where, hint}`: ask the user for that one key (tell them what it is for + where to get it), append it to `.env` (`printf '\n%s=%s\n' KEY VALUE >> .env`), then re-run the full bootstrap so the tool switches on. Re-check until `--report-missing-keys` prints `[]`. A just-migrated install shows `COMPOSIO_API_KEY` here - that is the single key the old OAuth->Composio step used to ask for, now handled the same way for every tool. If the user has no key to hand, the tool just stays off; nothing else is blocked.
+7. **Restart the daemon** (Guide Step 6, OS-specific).
+8. **Verify** (Guide Step 7). Run `/install-doctor`. Spot-check that `node ./template/bootstrap.js --report-missing-keys` is `[]`, `.mcp.json` no longer has `google_workspace`/`workspace-mcp`, `.nello-version` lists the applied migrations, and (if just migrated) `COMPOSIO_MCP_URL` is in `.env`. Open the dashboard - no Google OAuth prompt should appear.
+9. **Reconnect apps, one click each.** The user says **"connect my Gmail"** (and Calendar, Drive, etc) in chat or Telegram; that calls `COMPOSIO_MANAGE_CONNECTIONS`, hands back a `connect.composio.dev` link, they click Allow. Read/send/create work; delete and trash stay blocked (Guide Step 8).
 
 ## End
 

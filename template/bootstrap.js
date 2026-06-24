@@ -17,7 +17,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, copyFileSync, readdirSync, chmodSync, renameSync, realpathSync } from 'node:fs'
 import { join, dirname, basename, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
 import { execSync, spawnSync } from 'node:child_process'
 import Handlebars from 'handlebars'
@@ -89,6 +89,53 @@ const MCP_PURPOSES = {
   obsidian: 'read/write your vault directly',
   exa: 'web research with citations',
   apify: 'web scraping + Actor marketplace',
+}
+
+// Required keys per capability. A tool that's turned on (its `mcps` flag set) but
+// missing a REQUIRED key can't work - so on /update bootstrap reports the gap and
+// the skill prompts for just that one key (the interview-diff). This is what makes
+// a new tool propagate cleanly: ship the tool + add its required key here, and the
+// client's next /update asks for the single new key and nothing else. Optional keys
+// are deliberately NOT listed - an absent optional key just leaves its feature
+// gated off, exactly as today. `where`/`hint` give the skill the prompt copy.
+const KEY_MANIFEST = {
+  composio: {
+    enabled: (ctx) => !!ctx.mcps.composio,
+    required: [{ key: 'COMPOSIO_API_KEY', where: 'dashboard.composio.dev', hint: 'starts with ak_' }],
+  },
+  exa: {
+    enabled: (ctx) => !!ctx.mcps.exa,
+    required: [{ key: 'EXA_API_KEY', where: 'dashboard.exa.ai', hint: 'long alphanumeric string' }],
+  },
+  apify: {
+    enabled: (ctx) => !!ctx.mcps.apify,
+    required: [{ key: 'APIFY_TOKEN', where: 'console.apify.com - Settings - Integrations', hint: 'starts with apify_api_' }],
+  },
+  tavily: {
+    enabled: (ctx) => !!ctx.mcps.tavily,
+    required: [{ key: 'TAVILY_API_KEY', where: 'app.tavily.com', hint: 'starts with tvly-' }],
+  },
+  firecrawl: {
+    enabled: (ctx) => !!ctx.mcps.firecrawl,
+    required: [{ key: 'FIRECRAWL_API_KEY', where: 'firecrawl.dev', hint: 'starts with fc-' }],
+  },
+}
+
+// Required keys that an enabled tool still lacks. Drives the /update interview-diff
+// (via `--report-missing-keys`) and a non-fatal warning at the end of a full run.
+function missingRequiredKeys(ctx) {
+  const env = ctx.env || {}
+  const missing = []
+  for (const [tool, spec] of Object.entries(KEY_MANIFEST)) {
+    let on = false
+    try { on = !!spec.enabled(ctx) } catch { on = false }
+    if (!on) continue
+    for (const r of spec.required) {
+      const v = env[r.key]
+      if (v === undefined || v === null || String(v).trim() === '') missing.push({ tool, ...r })
+    }
+  }
+  return missing
 }
 
 function buildContext(bundle) {
@@ -250,17 +297,115 @@ function readEnvOverlay(envPath) {
   return out
 }
 
+// Read the existing version stamp (commit/date/appliedMigrations). Missing or
+// unreadable → {}. Used so writeVersionStamp can preserve appliedMigrations and
+// runMigrations can tell which migrations an install has already applied.
+function readVersionStamp(installPath) {
+  try {
+    return JSON.parse(readFileSync(join(installPath, '.nello-version'), 'utf-8')) || {}
+  } catch { return {} }
+}
+
 // Stamp the install with the code version it was built from, so /install-doctor
 // and the assistant can tell when a client is behind origin/main and prompt an
-// update. Best-effort: missing git or a detached repo just skips it, never fatal.
-function writeVersionStamp(installPath) {
+// update. Also records the migration ids this install has applied so the runner is
+// idempotent. The git commit/date are best-effort (missing git / detached repo just
+// leaves them as the previous value), but appliedMigrations is ALWAYS persisted -
+// it must never depend on git, or a migration could re-run every update.
+function writeVersionStamp(installPath, appliedMigrations) {
+  const prev = readVersionStamp(installPath)
+  const stamp = {
+    commit: prev.commit ?? null,
+    date: prev.date ?? null,
+    stampedAt: new Date().toISOString(),
+    appliedMigrations: appliedMigrations ?? prev.appliedMigrations ?? [],
+  }
   try {
     const opts = { cwd: TEMPLATE_DIR, stdio: ['ignore', 'pipe', 'ignore'] }
-    const commit = execSync('git rev-parse --short HEAD', opts).toString().trim()
-    const date = execSync('git log -1 --format=%cI', opts).toString().trim()
-    const stamp = { commit, date, stampedAt: new Date().toISOString() }
+    stamp.commit = execSync('git rev-parse --short HEAD', opts).toString().trim()
+    stamp.date = execSync('git log -1 --format=%cI', opts).toString().trim()
+  } catch {}
+  try {
     writeFileSync(join(installPath, '.nello-version'), JSON.stringify(stamp, null, 2) + '\n')
   } catch {}
+}
+
+// Patch bundle.json in place, applying only a structural mutation (e.g. flip an
+// mcps flag), without touching keys. Migrations use this to make a change durable:
+// the in-memory bundle drives THIS run's render, but the next run reloads
+// bundle.json, so a structural change (composio: true) has to land on disk too.
+// bundle.json always exists at /update time (the skill confirms it), so this runs.
+// Never re-spreads the .env secret overlay back into bundle.json.
+function patchBundleJsonFile(mutator) {
+  try {
+    if (!existsSync(BUNDLE_PATH)) return false
+    const b = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
+    mutator(b)
+    writeFileSync(BUNDLE_PATH, JSON.stringify(b, null, 2) + '\n')
+    return true
+  } catch (e) {
+    warn(`could not persist bundle.json change: ${e.message?.split('\n')[0] || e}`)
+    return false
+  }
+}
+
+// Versioned, idempotent stack migrations. Each module in template/migrations/ is
+// `NNNN-slug.js` exporting `default { id, description, detect(ctx), run(ctx) }`.
+// detect(ctx) returns truthy only when the OLD state is still present (so a fresh
+// or already-migrated install is a no-op). Every migration is recorded once in
+// .nello-version.appliedMigrations and never re-evaluated, so adding a stack change
+// = drop a new file here; the client's next /update applies exactly the pending ones.
+// Migrations run on the full bootstrap (which /update calls), not --configs-only.
+async function runMigrations(bundle) {
+  const dir = join(TEMPLATE_DIR, 'migrations')
+  const prev = readVersionStamp(INSTALL_PATH)
+  const applied = new Set(Array.isArray(prev.appliedMigrations) ? prev.appliedMigrations : [])
+  if (!existsSync(dir)) return [...applied]
+
+  const files = readdirSync(dir).filter(f => /^\d{4}-.*\.m?js$/.test(f)).sort()
+  if (files.length === 0) return [...applied]
+
+  bundle.keys = bundle.keys || {}
+  const mctx = {
+    installPath: INSTALL_PATH,
+    bundle,
+    env: bundle.keys,
+    patchBundle: patchBundleJsonFile,
+    ok, warn, info, fail,
+  }
+
+  let ran = 0
+  for (const f of files) {
+    let mod
+    try {
+      mod = (await import(pathToFileURL(join(dir, f)).href)).default
+    } catch (e) {
+      warn(`migration ${f} failed to load, skipping: ${e.message?.split('\n')[0] || e}`)
+      continue
+    }
+    if (!mod || !mod.id) { warn(`migration ${f} has no id, skipping`); continue }
+    if (applied.has(mod.id)) continue
+
+    let needed = true
+    try { needed = mod.detect ? !!mod.detect(mctx) : true }
+    catch (e) { warn(`migration ${mod.id} detect() threw, skipping: ${e.message?.split('\n')[0] || e}`); continue }
+
+    if (needed) {
+      try {
+        info(`Migration ${mod.id}${mod.description ? ` - ${mod.description}` : ''}`)
+        await mod.run(mctx)
+        ran++
+      } catch (e) {
+        // Leave it UNRECORDED so the next /update retries it; don't block the others.
+        fail(`migration ${mod.id} failed (will retry next update): ${e.message?.split('\n')[0] || e}`)
+        continue
+      }
+    }
+    // Record both "ran" and "not applicable here" so it's never re-evaluated.
+    applied.add(mod.id)
+  }
+  if (ran > 0) ok(`applied ${ran} migration${ran === 1 ? '' : 's'}`)
+  return [...applied]
 }
 
 // Lock a secret-bearing file to the current user only. chmod 600 covers Unix; on
@@ -941,7 +1086,9 @@ function validateVaultPath(vaultPath) {
 }
 
 async function main() {
-  console.log(BANNER)
+  // --report-missing-keys emits pure JSON to stdout (the /update skill parses it),
+  // so keep the banner out of its output. Every other path prints it.
+  if (!process.argv.includes('--report-missing-keys')) console.log(BANNER)
 
   if (!existsSync(BUNDLE_PATH)) {
     fail(`bundle not found at ${BUNDLE_PATH}`)
@@ -949,8 +1096,13 @@ async function main() {
   }
 
   const CONFIGS_ONLY = process.argv.includes('--configs-only')
+  // Read-only query mode: print the required keys an enabled tool still lacks (as
+  // JSON) and exit. The /update skill calls this to drive the interview-diff -
+  // prompt for just the missing keys, write them to .env, re-render. No writes,
+  // no migrations, no provisioning, no stale-install scan.
+  const REPORT_MISSING = process.argv.includes('--report-missing-keys')
 
-  if (!CONFIGS_ONLY) detectStaleInstalls()
+  if (!CONFIGS_ONLY && !REPORT_MISSING) detectStaleInstalls()
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
   validateBundle(bundle)
@@ -965,10 +1117,21 @@ async function main() {
   // output unchanged.
   bundle.keys = { ...(bundle.keys || {}), ...readEnvOverlay(join(INSTALL_PATH, '.env')) }
 
+  // Versioned stack migrations (full bootstrap only - the path /update runs). These
+  // are deterministic transforms keyed by id, applied at most once, recorded in
+  // .nello-version. They mutate bundle.keys (-> .env via writeEnv) and bundle.mcps
+  // (-> bundle.json via patchBundle), so they must run BEFORE the Composio provision
+  // and buildContext below, where those values are read.
+  let appliedMigrations
+  if (!CONFIGS_ONLY && !REPORT_MISSING) {
+    appliedMigrations = await runMigrations(bundle)
+  }
+
   // Composio: the only value collected is the API key. Mint this install's durable
   // Tool Router URL from it automatically (destructiveHint disabled = no delete/trash),
-  // so nobody pastes a URL. Skip if one was already provided (wizard pre-provisioned).
-  if (bundle.keys?.COMPOSIO_API_KEY && !bundle.keys?.COMPOSIO_MCP_URL) {
+  // so nobody pastes a URL. Skip if one was already provided (wizard pre-provisioned),
+  // and skip entirely for the read-only --report-missing-keys query (no network call).
+  if (!REPORT_MISSING && bundle.keys?.COMPOSIO_API_KEY && !bundle.keys?.COMPOSIO_MCP_URL) {
     const userId = bundle.keys.COMPOSIO_USER_ID || bundle.keys.GOOGLE_USER_EMAIL
     if (!userId) {
       fail('COMPOSIO_API_KEY set but no COMPOSIO_USER_ID / GOOGLE_USER_EMAIL to key the connections to.')
@@ -986,11 +1149,21 @@ async function main() {
   }
 
   const ctx = buildContext(bundle)
+
+  // --report-missing-keys: print the required-but-absent keys for enabled tools and
+  // stop. Read-only - no vault validation, no stamp, no file writes.
+  if (REPORT_MISSING) {
+    process.stdout.write(JSON.stringify(missingRequiredKeys(ctx)) + '\n')
+    return
+  }
+
   validateVaultPath(ctx.vaultPath)
 
   // Record the code version this install was built from (for /install-doctor + the
-  // update-staleness check). Both the full install and --configs-only restamp.
-  writeVersionStamp(INSTALL_PATH)
+  // update-staleness check) plus the migrations applied. Both the full install and
+  // --configs-only restamp; --configs-only passes no migration list so the prior
+  // appliedMigrations is preserved.
+  writeVersionStamp(INSTALL_PATH, appliedMigrations)
 
   // --configs-only: the `sync-env-to-configs.sh` fast path. Regenerate JUST
   // .mcp.json + claude_desktop_config.json from the live .env (already overlaid
@@ -1035,6 +1208,16 @@ async function main() {
   writeMergedMcpConfig(join(INSTALL_PATH, 'claude_desktop_config.json'), renderClaudeDesktopConfig(ctx), managedMcpKeys(renderClaudeDesktopConfig))
   writeEnv(bundle)
   ok('CLAUDE.md, AGENTS.md, brain-context.md, .env, .mcp.json, claude_desktop_config.json')
+
+  // A tool was turned on but a required key is missing - say so loudly rather than
+  // let it fail silently later. /update collects these for you (the interview-diff);
+  // a manual install can just add the key to .env and re-run.
+  const missingKeys = missingRequiredKeys(ctx)
+  if (missingKeys.length) {
+    const plural = missingKeys.length > 1
+    warn(`Missing required key${plural ? 's' : ''} for enabled tool${plural ? 's' : ''}: ${missingKeys.map(m => `${m.key} (${m.tool}, from ${m.where})`).join('; ')}`)
+    warn(`Add ${plural ? 'them' : 'it'} to .env to switch ${plural ? 'those tools' : 'that tool'} on. /update prompts for new keys automatically.`)
+  }
 
   info('Seeding vault')
   const { seedVault } = await import('./packages/vault-seeder/dist/seed.js')
