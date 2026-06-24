@@ -74,6 +74,20 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 - Confirm `.obsidian/appearance.json` has `"accentColor": "#FFA600"`
 - **Brain seeded?** Count taxonomy notes: `ls vault | grep -cE '^(Person|Client|Project)-'` (also check subfolders). Zero of all three on a real client = ⚠ "brain not seeded - run /build-brain (point me at a ChatGPT export) or seed from the interview".
 
+## 10b. Semantic recall (gbrain) - only if `VOYAGE_API_KEY` is set
+
+Skip this whole section silently if `.env` has no `VOYAGE_API_KEY` (recall is off by design - not a failure).
+
+If `VOYAGE_API_KEY` IS set:
+- `NC_MEMORY_ENGINE` in `.env` should be `gbrain` (bootstrap sets it from the key). If it's empty/`legacy` while the key is present, recall won't run - ⚠ "re-run bootstrap".
+- `ls ~/.bun/bin/gbrain` exists AND `~/.bun/bin/gbrain --version` prints `gbrain X.Y.Z` (must be **garrytan/gbrain**, the brain - NOT the npm GPU library). Missing = ✗ "bun/gbrain didn't install; re-run bootstrap (needs a VOYAGE_API_KEY present)".
+- **Daemon PATH:** the service must have `~/.bun/bin` on PATH or it can't spawn gbrain. Mac: `launchctl print gui/$(id -u)/com.nello-claw.server | grep -i path` (or read the plist `EnvironmentVariables` PATH). If `~/.bun/bin` is absent → ✗ "recall will fail 'failed to spawn gbrain'; re-run the service install".
+- `ls ~/.gbrain/brain.pglite` exists (the local index). gbrain reads `VOYAGE_API_KEY` from the env, so source it from `.env` for the next two checks:
+  `VK=$(grep -m1 '^VOYAGE_API_KEY=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")`
+- `VOYAGE_API_KEY="$VK" ~/.bun/bin/gbrain doctor --fast` is healthy. Report the page/embedding count (embeddings should be ≈ pages; far fewer = un-embedded notes, suggest `/build-recall`).
+- **Voyage canary (a revoked/expired key fails silently):** `VOYAGE_API_KEY="$VK" ~/.bun/bin/gbrain query "test" --no-expand`. A 401/auth error in the output = ✗ "Voyage key rejected - recall is silently dead; rotate the key in `.env` and restart the daemon". No error (even zero hits) = ✓.
+- **Did the daemon actually pick it up?** `config.ts` reads `NC_MEMORY_ENGINE` once at boot. If the key/engine was added AFTER the daemon started, the doctor sees `gbrain` in `.env` but the live daemon is still on `legacy`. Confirm the daemon was (re)started since the key was set; if unsure, `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` (Mac) and watch `store/server.log`.
+
 ## 11. Chat round-trip test
 
 First create a real chat (FOREIGN KEY constraint requires the chat to exist):
@@ -135,6 +149,7 @@ Channel: telegram | whatsapp
 [9]  Project settings     ✓ / ⚠ / ✗
 [9b] MCP config sane      ✓ / ⚠ / ✗
 [10] Vault state          ✓ / ⚠ / ✗
+[10b] Semantic recall     ✓ / ⚠ / ✗ / n/a (gbrain - only if VOYAGE_API_KEY set)
 [11] Chat round-trip      ✓ / ✗
 [12] Messaging channel    ✓ / ⚠ / ✗
 [13] Permissions          ✓ / ⚠
@@ -158,6 +173,7 @@ NEXT 3 THINGS TO FIX (priority order):
 | WhatsApp not linked / `(no response)` | Run `/connect-whatsapp`, scan the QR. If it keeps refusing (`LINK_401`), WhatsApp is throttling - wait, then retry. |
 | WhatsApp answers its own messages | Old build without the echo guard. Rebuild (`pnpm -r build`) and restart the daemon. |
 | Apps won't connect (Composio) | Check `COMPOSIO_API_KEY` + `COMPOSIO_MCP_URL` in `.env`, then re-run `scripts/sync-env-to-configs.sh` |
+| Recall not working / no `[recall]` in replies | `VOYAGE_API_KEY` set? `~/.bun/bin/gbrain --version` works? `~/.bun/bin` on the daemon PATH? `NC_MEMORY_ENGINE=gbrain`? If the key was rejected (Voyage canary 401), rotate it. Re-run bootstrap after fixing the key. |
 | Vault doesn't open in Obsidian | Obsidian not installed. Get it from obsidian.md/download |
 | Permission prompts won't go away | Mac TCC blocked the daemon. System Settings → Privacy & Security → grant access to `node` |
 

@@ -2,7 +2,8 @@ import { join } from 'node:path'
 import { mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync } from 'node:fs'
 import { saveMemory, searchMemories, getRecentMemories, touchMemory, decayMemories, getDb, type Memory } from './db.js'
 import { logger } from './logger.js'
-import { VAULT_PATH, MEMORY_DELETE_THRESHOLD, MEMORY_DAILY_DECAY } from './config.js'
+import { VAULT_PATH, MEMORY_DELETE_THRESHOLD, MEMORY_DAILY_DECAY, MEMORY_ENGINE } from './config.js'
+import { gbrainSearch } from './brain.js'
 
 const SEMANTIC_PATTERNS = [
   /\b(my|i am|i'm|i prefer|remember|always|never)\b/i,
@@ -17,7 +18,13 @@ function isSemanticContent(text: string): boolean {
 
 /**
  * Build memory context to inject above the user's message.
- * Combines FTS keyword search + recent-access list. Dedupes. Touches each.
+ * Combines FTS keyword search + recent-access list + (when NC_MEMORY_ENGINE=gbrain)
+ * gbrain semantic recall over the vault. Dedupes. Touches each.
+ *
+ * The gbrain block runs BEFORE the empty-conversation-memory early-return on
+ * purpose: a brand-new client has no FTS rows yet (cold start) - exactly when
+ * vault recall matters most - so returning early there would silently starve the
+ * brain. gbrainSearch self-guards (hard timeout + silent []), so it never blocks.
  */
 export async function buildMemoryContext(chatId: string, userMessage: string): Promise<string> {
   const seen = new Set<number>()
@@ -31,12 +38,31 @@ export async function buildMemoryContext(chatId: string, userMessage: string): P
     if (!seen.has(mem.id)) { memories.push(mem); seen.add(mem.id) }
   }
 
-  if (memories.length === 0) return ''
+  // Semantic recall from the vault (gbrain). Off unless NC_MEMORY_ENGINE=gbrain
+  // (bootstrap sets it only when a VOYAGE_API_KEY is present). Never throws.
+  let recall: string[] = []
+  if (MEMORY_ENGINE === 'gbrain' && userMessage.trim().length > 2) {
+    try {
+      recall = await gbrainSearch(userMessage, 4, 3000)
+    } catch (err) {
+      logger.debug({ err }, 'gbrain recall failed (non-fatal)')
+    }
+  }
+
+  if (memories.length === 0 && recall.length === 0) return ''
 
   for (const mem of memories) touchMemory(mem.id)
 
-  const lines = memories.map(m => `- ${m.content} (${m.sector})`).join('\n')
-  return `[Memory context]\n${lines}\n`
+  const blocks: string[] = []
+  if (memories.length > 0) {
+    const lines = memories.map(m => `- ${m.content} (${m.sector})`).join('\n')
+    blocks.push(`[Memory context]\n${lines}`)
+  }
+  if (recall.length > 0) {
+    const lines = recall.map(r => `- ${r}`).join('\n')
+    blocks.push(`[recall]\n${lines}`)
+  }
+  return blocks.join('\n') + '\n'
 }
 
 /**

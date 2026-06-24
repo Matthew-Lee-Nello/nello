@@ -177,6 +177,14 @@ The SessionStart hook reads `vault/Memory/MEMORY.md`, today's + yesterday's `vau
 
 **agentmemory plugin** is installed for durable, cross-session facts. Reach for its skills (`agentmemory:remember`, `agentmemory:recall`) when a fact must survive beyond the decaying SQLite session memory - preferences, decisions, and standing context you want available on every future session and surface.
 
+{{#if brainEnabled}}
+## Semantic recall (the brain)
+
+Semantic recall is ON. Before every reply, the vault is searched by meaning (gbrain: hybrid vector + keyword + graph) and the top hits are injected above the message as a `[recall]` block. Treat `[recall]` as known facts about {{name}}'s people, clients, deals and concepts - use it, don't ignore it.
+
+When a knowledge question needs more than the injected snippets, search the vault yourself before answering (the obsidian MCP, or Grep over `{{installPath}}/vault/`) - don't ask permission, just search. The vault is the source of truth for anything {{name}} has captured; lean on it before falling back to general knowledge.
+
+{{/if}}
 ## Vault Taxonomy - {{vaultPreset}}
 
 {{#if (eq vaultPreset "nello")}}

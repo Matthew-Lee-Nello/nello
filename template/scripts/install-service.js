@@ -50,6 +50,11 @@ const NODE = process.execPath
 // /usr/local|/opt/homebrew bins (otherwise hooks + voice features fail "command
 // not found"). The daemon itself launches via the absolute NODE above regardless.
 const NODE_BIN = dirname(NODE)
+// gbrain (the semantic-recall engine) is a Bun global living in ~/.bun/bin, which
+// is NOT a standard system bin. The daemon spawns `gbrain` by name from a minimal
+// launchd/systemd environment, so this dir MUST be on the service PATH or recall
+// fails "failed to spawn gbrain" (the same Node-on-PATH class of bug as before).
+const BUN_BIN = join(homedir(), '.bun', 'bin')
 // Daemon entry compiled to template/dist/index.js (the @nc/template package
 // builds into its own dist/, not the install root). Don't change without also
 // fixing template/package.json's build output path.
@@ -89,7 +94,7 @@ function installMac() {
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>${NODE_BIN}:/opt/homebrew/bin:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin</string>
+        <string>${NODE_BIN}:${BUN_BIN}:/opt/homebrew/bin:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin</string>
         <key>HOME</key>
         <string>${homedir()}</string>
         <key>NC_INSTALL_PATH</key>
@@ -134,7 +139,7 @@ function installWindows() {
     // resolve even when the login/Git Bash PATH lacks Node. Parity with the Mac
     // plist + Linux unit; without it the agent SDK fails "failed to spawn code
     // process node".
-    `set "PATH=${NODE_BIN};%PATH%"\r\n` +
+    `set "PATH=${NODE_BIN};${BUN_BIN};%PATH%"\r\n` +
     `"${NODE}" "${ENTRY}" >> "${logFile}" 2>&1\r\n`
   writeFileSync(wrapper, wrapperContent)
 
@@ -217,7 +222,7 @@ ExecStart=${NODE} ${ENTRY}
 WorkingDirectory=${INSTALL}
 Environment=NC_INSTALL_PATH=${INSTALL}
 Environment=NC_VAULT_PATH=${VAULT}
-Environment=PATH=${NODE_BIN}:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin
+Environment=PATH=${NODE_BIN}:${BUN_BIN}:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin
 Restart=always
 RestartSec=5
 StandardOutput=append:${INSTALL}/store/server.log
