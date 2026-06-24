@@ -55,7 +55,6 @@ export function initDatabase(db: Database.Database = getDb()): void {
       content TEXT NOT NULL,
       sector TEXT NOT NULL CHECK(sector IN ('semantic','episodic')),
       salience REAL NOT NULL DEFAULT 1.0,
-      embedding BLOB,
       created_at INTEGER NOT NULL,
       accessed_at INTEGER NOT NULL
     );
@@ -168,7 +167,6 @@ export interface Memory {
   content: string
   sector: 'semantic' | 'episodic'
   salience: number
-  embedding: Buffer | null
   created_at: number
   accessed_at: number
 }
