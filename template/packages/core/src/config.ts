@@ -50,6 +50,14 @@ export const COMPOSIO_API_KEY = env['COMPOSIO_API_KEY'] ?? ''
 export const COMPOSIO_MCP_URL = env['COMPOSIO_MCP_URL'] ?? ''
 export const COMPOSIO_USER_ID = env['COMPOSIO_USER_ID'] ?? (env['GOOGLE_USER_EMAIL'] ?? '')
 
+// Semantic recall (gbrain). VOYAGE_API_KEY is the master switch: when present,
+// bootstrap installs gbrain + flips NC_MEMORY_ENGINE to 'gbrain', and
+// buildMemoryContext augments every reply with vault knowledge (hybrid vector +
+// BM25 + typed-edge graph) via the local gbrain CLI. Empty key → MEMORY_ENGINE
+// stays 'legacy' and nothing brain-related runs (identical to a no-recall install).
+export const VOYAGE_API_KEY = env['VOYAGE_API_KEY'] ?? ''
+export const MEMORY_ENGINE = (env['NC_MEMORY_ENGINE'] ?? 'legacy').trim().toLowerCase()
+
 // Optional integrations
 export const OPENAI_API_KEY = env['OPENAI_API_KEY'] ?? ''
 export const GOOGLE_USER_EMAIL = env['GOOGLE_USER_EMAIL'] ?? ''

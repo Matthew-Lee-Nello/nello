@@ -114,6 +114,16 @@ export function renderClaudeDesktopConfig(ctx) {
 
 export function renderSettingsJson(ctx) {
   const installPath = ctx.installPath
+  // PostToolUse vault hooks. graphify-incremental ships always (skips silently if
+  // graphify isn't installed). gbrain-sync is added ONLY for a brain-enabled
+  // install (a VOYAGE_API_KEY is present) so a keyless box registers nothing new
+  // and stays byte-for-byte identical to a no-recall install.
+  const postToolUseHooks = [
+    { type: 'command', command: `node "${installPath}/template/hooks/graphify-incremental.js"` },
+  ]
+  if (ctx.brainEnabled) {
+    postToolUseHooks.push({ type: 'command', command: `node "${installPath}/template/hooks/gbrain-sync.js"` })
+  }
   return {
     permissions: {
       defaultMode: 'bypassPermissions',
@@ -166,9 +176,7 @@ export function renderSettingsJson(ctx) {
       PostToolUse: [
         {
           matcher: 'Edit|Write',
-          hooks: [
-            { type: 'command', command: `node "${installPath}/template/hooks/graphify-incremental.js"` },
-          ],
+          hooks: postToolUseHooks,
         },
       ],
       Stop: [
