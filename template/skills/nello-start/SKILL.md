@@ -73,12 +73,13 @@ Then say:
 
 Right now, on your computer:
 
-- A **custom dashboard** is running at `localhost:3000`. That's where you'll do most of your chatting from now on.
-- **Obsidian.app** is installed with the NELLO vault preset. That's your AI's long-term memory.
-- A **Telegram bot** is alive. The bot you set up in step 2. Try sending it a message right now and watch it reply.
-- **Gmail, Drive, Docs, Sheets, Calendar** are one click from connected. Say "connect my Gmail" and click the link your assistant hands you - then it can read, send and create across all of them.
+- A **Telegram bot** is alive. The bot you set up in step 2 - that's where you talk to Nello, day to day. Try sending it a message right now and watch it reply.
+- A **control panel** is running at `localhost:3000`. Two tabs: **Scheduled Tasks** (set up recurring jobs) and **Monitor** (is everything healthy). You chat with Nello on Telegram, not here.
+- **Obsidian.app** is installed with the NELLO vault preset. That's Nello's long-term memory.
+- **Gmail, Drive, Docs, Sheets, Calendar** are one click from connected. Say "connect my Gmail" and click the link Nello hands you - then it can read, send and create across all of them.
 - **Live web research** is wired up via Exa.
-- A **LaunchAgent** keeps the daemon running on your computer. As long as your computer is on, your assistant is on.
+- **RTK** is installed - a token saver that quietly trims command output so Nello does more work for less. It runs on your machine; none of your data leaves it.
+- A **LaunchAgent** keeps Nello running on your computer. As long as your computer is on, Nello is on.
 
 ### What each piece does, in plain English
 

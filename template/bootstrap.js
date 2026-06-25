@@ -893,6 +893,28 @@ function setupRecall(ctx) {
   seedRecall(ctx)
 }
 
+// ---------- RTK (token saver) ----------
+// RTK is a local CLI proxy that trims dev-command output so the assistant spends far
+// fewer tokens on routine work. Shipped to every install. Best-effort + non-fatal: a
+// failed/absent install just means the PreToolUse hook (runtime-gated on `rtk` being
+// on PATH) stays a no-op until rtk is present. Local only - reads nothing off-machine.
+function installRtk() {
+  if (commandExists('rtk')) { ok('rtk already installed (token saver)'); return }
+  const platform = process.platform
+  try {
+    if (platform === 'darwin' && commandExists('brew')) {
+      execSync('brew install rtk', { stdio: 'pipe' })
+      ok('rtk installed (token saver - trims dev-command output)')
+    } else if (platform === 'darwin') {
+      warn('rtk not installed: Homebrew missing. Install brew (brew.sh) then `brew install rtk` to cut token use. The hook self-activates once it is on PATH.')
+    } else {
+      warn('rtk auto-install is Mac-only for now. Install rtk from rtk-ai.app to cut token use; the hook self-activates once it is on PATH.')
+    }
+  } catch (err) {
+    warn(`rtk install failed (${err.message?.split('\n')[0] || 'unknown'}). Non-fatal - install later from rtk-ai.app; the hook self-activates.`)
+  }
+}
+
 // Cache result so end-of-install summary can mention if user still needs to install Obsidian.
 let _obsidianInstalled = false
 
@@ -1270,6 +1292,9 @@ async function main() {
   // Semantic recall: installs Bun + gbrain + graphify and embeds the seeded vault
   // via OpenAI. No-op unless an OPENAI_API_KEY is present (ctx.brainEnabled).
   setupRecall(ctx)
+
+  // RTK token saver (every install; best-effort + non-fatal).
+  installRtk()
 
   if (bundle.installLaunchAgent) {
     info('Installing auto-start service')

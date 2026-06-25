@@ -154,6 +154,10 @@ export function renderSettingsJson(ctx) {
           matcher: 'Bash',
           hooks: [
             { type: 'command', command: `node "${installPath}/template/hooks/block-dangerous-git.js"` },
+            // RTK token-saver: rewrites dev-command output so the assistant burns far
+            // fewer tokens. Runtime-gated on rtk being on PATH (self-heals - no-op
+            // until the brew install lands, active the moment it does). Runs locally.
+            { type: 'command', command: 'if command -v rtk >/dev/null 2>&1; then exec rtk hook claude; fi' },
           ],
         },
       ],
