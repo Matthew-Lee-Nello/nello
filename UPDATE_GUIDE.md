@@ -40,10 +40,14 @@ Then restart the daemon (Step 6) and tell the user the exact error you saw. Do n
 
 ## Step 1 - Stop the daemon
 
-So nothing is running mid-update.
-- **Mac:** `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.nello.server.plist` (ignore "not found")
-- **Windows:** `schtasks /End /TN "com.nello.server"`
-- **Linux:** `systemctl --user stop com.nello.server`
+So nothing is running mid-update. During the v1.0 transition an older install still
+runs the previous service name (`com.nello-claw.server`), so stop BOTH labels - the
+new one and the old one. Whichever doesn't exist just prints "not found"; ignore it.
+(Migration `0004` also retires the old service, but stopping it here keeps it off the
+files while they rebuild.)
+- **Mac:** `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.nello.server.plist 2>/dev/null; launchctl bootout gui/$(id -u)/com.nello-claw.server 2>/dev/null; true`
+- **Windows:** `schtasks /End /TN "com.nello.server" & schtasks /End /TN "com.nello-claw.server"`
+- **Linux:** `systemctl --user stop com.nello.server com.nello-claw.server`
 
 ## Step 2 - Pull the latest code (latest `main`)
 
