@@ -1,8 +1,11 @@
 import type { NextConfig } from 'next'
-import { execSync } from 'node:child_process'
+import { execSync, } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // Latest git commit timestamp, burned in at build time. Vercel rebuilds on every
-// push, so this naturally tracks "last updated". Falls back to build time if git
+// push to production, so this tracks "last updated" - if it ever looks stale, the
+// site just hasn't been redeployed since the change. Falls back to build time if git
 // isn't available (running outside a repo).
 const lastCommitISO = (() => {
   try {
@@ -11,6 +14,16 @@ const lastCommitISO = (() => {
       .trim()
   } catch {
     return new Date().toISOString()
+  }
+})()
+
+// The release version, read from the repo-root VERSION file at build time, so the
+// site can show "Nello v1.0.0" next to the date.
+const version = (() => {
+  try {
+    return readFileSync(join(process.cwd(), '..', 'VERSION'), 'utf-8').trim()
+  } catch {
+    return ''
   }
 })()
 
@@ -60,6 +73,7 @@ const config: NextConfig = {
   experimental: { typedRoutes: true },
   env: {
     NEXT_PUBLIC_LAST_UPDATED: lastCommitISO,
+    NEXT_PUBLIC_VERSION: version,
   },
   async headers() {
     return [

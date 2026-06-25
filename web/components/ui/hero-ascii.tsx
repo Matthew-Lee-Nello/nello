@@ -178,7 +178,7 @@ export default function HeroAscii() {
             <ClaudeBuddy size={300} />
             <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[0.22em] text-[var(--muted)] opacity-80">
               <span className="w-1 h-1 rounded-full bg-[var(--accent)]" />
-              LAST UPDATED · {lastUpdated}
+              {process.env.NEXT_PUBLIC_VERSION ? `NELLO v${process.env.NEXT_PUBLIC_VERSION} · ` : ''}LAST UPDATED · {lastUpdated}
             </div>
           </div>
         </div>
