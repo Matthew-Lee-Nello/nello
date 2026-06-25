@@ -25,7 +25,7 @@ import { join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { execFile } from 'node:child_process'
 
-const INSTALL = process.env.NC_INSTALL_PATH || join(homedir(), 'nello-claw')
+const INSTALL = process.env.NC_INSTALL_PATH || join(homedir(), 'nello')
 const GBRAIN_BIN = join(homedir(), '.bun', 'bin', 'gbrain')
 if (!existsSync(GBRAIN_BIN)) process.exit(0)
 

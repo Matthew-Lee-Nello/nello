@@ -3,15 +3,15 @@
 import Link from 'next/link'
 import { useState } from 'react'
 
-const CONSOLIDATE_PROMPT = `I just installed NelloClaw fresh in this folder. I also have an older Claude Code setup somewhere on this machine.
+const CONSOLIDATE_PROMPT = `I just installed Nello fresh in this folder. I also have an older Claude Code setup somewhere on this machine.
 
 Find my old setup. Common spots: ~/.claude/ for global settings, skills and plugins; ~/<old-project>/ with its own CLAUDE.md, .mcp.json, hooks; vault folders with markdown notes; any .env with API keys I might want.
 
-For each piece you find, decide if it is worth pulling into NelloClaw and ask me y/n before importing:
+For each piece you find, decide if it is worth pulling into Nello and ask me y/n before importing:
 - Skills under ~/.claude/skills/ that are not already in this install
 - MCPs in the old project's .mcp.json that we do not have
 - Useful prompt fragments or rules from the old CLAUDE.md
-- Vault notes worth merging into nello-claw/vault/
+- Vault notes worth merging into nello/vault/
 - Scheduled tasks worth recreating
 
 Do not modify or delete the old setup. Read only. If unsure, ask.

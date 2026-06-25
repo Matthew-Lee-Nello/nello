@@ -82,7 +82,7 @@ function runChecks(): Check[] {
 
   // 7. LaunchAgent (macOS only, skip if user opted out)
   if (process.platform === 'darwin') {
-    const label = process.env.NC_LAUNCHAGENT_LABEL || 'com.nello-claw.server'
+    const label = process.env.NC_LAUNCHAGENT_LABEL || 'com.nello.server'
     const plist = join(homedir(), 'Library', 'LaunchAgents', `${label}.plist`)
     const projectPlist = join(PROJECT_ROOT, `${label}.plist`)
     if (existsSync(projectPlist) || existsSync(plist)) {
@@ -96,7 +96,7 @@ function runChecks(): Check[] {
 }
 
 export function runAudit(): void {
-  console.log(`\n${ACCENT}nello-claw audit${RESET}\n${DIM}${'─'.repeat(44)}${RESET}`)
+  console.log(`\n${ACCENT}nello audit${RESET}\n${DIM}${'─'.repeat(44)}${RESET}`)
   const checks = runChecks()
   let failed = 0
   for (const c of checks) {

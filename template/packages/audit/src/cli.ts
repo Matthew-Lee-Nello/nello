@@ -6,6 +6,6 @@ switch (cmd) {
   case 'audit':  runAudit();  break
   case 'doctor': runDoctor(); break
   default:
-    console.log(`Usage: nello-claw <audit|doctor>`)
+    console.log(`Usage: nello <audit|doctor>`)
     process.exit(1)
 }

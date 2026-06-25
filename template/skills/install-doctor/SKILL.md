@@ -1,13 +1,13 @@
 ---
 name: install-doctor
-description: End-to-end audit of a nello-claw install. Reports what's wired, what's broken, where it stalled, what permissions are stuck. Use when the dashboard isn't responding, the assistant says "(no response)", Obsidian or the Telegram bot aren't working, or the user just wants a sanity check. Triggers on "install doctor", "audit my install", "what's broken", "/install-doctor".
+description: End-to-end audit of a nello install. Reports what's wired, what's broken, where it stalled, what permissions are stuck. Use when the dashboard isn't responding, the assistant says "(no response)", Obsidian or the Telegram bot aren't working, or the user just wants a sanity check. Triggers on "install doctor", "audit my install", "what's broken", "/install-doctor".
 trigger: /install-doctor
 model_hint: fast
 ---
 
 # /install-doctor - End-to-End Install Audit
 
-Audit the nello-claw install from inside the install folder. Print a readable report with `✓` for OK, `✗` for broken, `⚠` for warnings. End with a "next 3 things to fix" list, ordered by impact.
+Audit the nello install from inside the install folder. Print a readable report with `✓` for OK, `✗` for broken, `⚠` for warnings. End with a "next 3 things to fix" list, ordered by impact.
 
 Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 
@@ -15,7 +15,7 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 - `ls -la ./`
 - Confirm these all exist: `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.env`, `.claude/settings.json`, `vault/`, `store/`, `dist/`, `node_modules/`, `template/skills/`
 - `stat -f "%p" .env` - must end in `600` for security (only the user can read keys)
-- **Version + updates:** `cat .nello-version` (the commit + date this install was built from). Then check drift: `git fetch origin main -q 2>/dev/null && git rev-list --count HEAD..origin/main 2>/dev/null`. If it returns 1 or more, report "behind by N - a newer nello-claw is out, run /update". If `.nello-version` is missing, the install predates version stamping (so it's behind - recommend /update). If the count is 0, report "up to date".
+- **Version + updates:** `cat .nello-version` (the commit + date this install was built from). Then check drift: `git fetch origin main -q 2>/dev/null && git rev-list --count HEAD..origin/main 2>/dev/null`. If it returns 1 or more, report "behind by N - a newer nello is out, run /update". If `.nello-version` is missing, the install predates version stamping (so it's behind - recommend /update). If the count is 0, report "up to date".
 
 ## 2. Env keys (mask values)
 - Read `.env`. List every `KEY=` line. Never print actual key values.
@@ -24,9 +24,9 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 - **`DASHBOARD_TOKEN` is OPTIONAL** - empty is fine and is the default (no ✗). The dashboard binds `127.0.0.1` (loopback-only) and has an Origin/CSRF guard, so a local install needs no token. Only set it if you expose the dashboard beyond localhost (Tailscale serve / a tunnel); setting it re-enables the auth gate.
 
 ## 3. Services (Mac launchd / Win schtasks / Linux systemd)
-- Mac: `launchctl list | grep nello-claw` - report PID + last exit code
-- Win: `schtasks /Query /TN "com.nello-claw.server" /FO LIST`
-- Linux: `systemctl --user status com.nello-claw.server`
+- Mac: `launchctl list | grep nello` - report PID + last exit code
+- Win: `schtasks /Query /TN "com.nello.server" /FO LIST`
+- Linux: `systemctl --user status com.nello.server`
 - `lsof -i :3000` (or whatever `DASHBOARD_PORT` is in `.env`) - confirm something is listening
 
 ## 4. Daemon health
@@ -44,11 +44,11 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 - `which uv && uv --version` (used by some MCP servers)
 - `which obsidian-cli && obsidian-cli --version`
 - `ls -la /Applications/Obsidian.app` (Mac) or `%LOCALAPPDATA%\Obsidian\Obsidian.exe` (Win)
-- `ls -la ~/Applications/nello-claw.app` (Mac shortcut)
+- `ls -la ~/Applications/nello.app` (Mac shortcut)
 
 ## 7. Claude Code auth (the most common cause of "no response")
 - `ls -la ~/.claude/auth.json`
-- If missing: the daemon can't talk to Claude. Run `claude` once in a terminal to log in, then restart the daemon: `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server`
+- If missing: the daemon can't talk to Claude. Run `claude` once in a terminal to log in, then restart the daemon: `launchctl kickstart -k gui/$(id -u)/com.nello.server`
 - If present, check `mtime` - older than a few weeks may need refresh
 
 ## 8. Skills wired
@@ -80,12 +80,12 @@ Skip this whole section silently if `.env` has no `OPENAI_API_KEY` (recall is of
 If `OPENAI_API_KEY` IS set:
 - `NC_MEMORY_ENGINE` in `.env` should be `gbrain` (bootstrap sets it from the key). If it's empty/`legacy` while the key is present, recall won't run - ⚠ "re-run bootstrap".
 - `ls ~/.bun/bin/gbrain` exists AND `~/.bun/bin/gbrain --version` prints `gbrain X.Y.Z` (must be **garrytan/gbrain**, the brain - NOT the npm GPU library). Missing = ✗ "bun/gbrain didn't install; re-run bootstrap (needs an OPENAI_API_KEY present)".
-- **Daemon PATH:** the service must have `~/.bun/bin` on PATH or it can't spawn gbrain. Mac: `launchctl print gui/$(id -u)/com.nello-claw.server | grep -i path` (or read the plist `EnvironmentVariables` PATH). If `~/.bun/bin` is absent → ✗ "recall will fail 'failed to spawn gbrain'; re-run the service install".
+- **Daemon PATH:** the service must have `~/.bun/bin` on PATH or it can't spawn gbrain. Mac: `launchctl print gui/$(id -u)/com.nello.server | grep -i path` (or read the plist `EnvironmentVariables` PATH). If `~/.bun/bin` is absent → ✗ "recall will fail 'failed to spawn gbrain'; re-run the service install".
 - `ls ~/.gbrain/brain.pglite` exists (the local index). gbrain reads `OPENAI_API_KEY` from the env, so source it from `.env` for the next two checks:
   `OK=$(grep -m1 '^OPENAI_API_KEY=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")`
 - `OPENAI_API_KEY="$OK" ~/.bun/bin/gbrain doctor --fast` is healthy. Report the page/embedding count (embeddings should be ≈ pages; far fewer = un-embedded notes, suggest `/build-recall`).
 - **OpenAI canary (a revoked/expired key fails silently):** `OPENAI_API_KEY="$OK" ~/.bun/bin/gbrain query "test" --no-expand`. A 401/auth error in the output = ✗ "OpenAI key rejected - recall is silently dead; rotate the key in `.env` and restart the daemon". No error (even zero hits) = ✓.
-- **Did the daemon actually pick it up?** `config.ts` reads `NC_MEMORY_ENGINE` once at boot. If the key/engine was added AFTER the daemon started, the doctor sees `gbrain` in `.env` but the live daemon is still on `legacy`. Confirm the daemon was (re)started since the key was set; if unsure, `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` (Mac) and watch `store/server.log`.
+- **Did the daemon actually pick it up?** `config.ts` reads `NC_MEMORY_ENGINE` once at boot. If the key/engine was added AFTER the daemon started, the doctor sees `gbrain` in `.env` but the live daemon is still on `legacy`. Confirm the daemon was (re)started since the key was set; if unsure, `launchctl kickstart -k gui/$(id -u)/com.nello.server` (Mac) and watch `store/server.log`.
 
 ## 11. Chat round-trip test
 
@@ -106,20 +106,20 @@ Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full r
 
 ## 13. Permissions / friction
 - Mac: any pending sudo prompts (`sudo -n true`)
-- Mac TCC: scan recent `console.log` for "Privacy & Security" denials affecting `claude`, `node`, `obsidian`, or `nello-claw`
+- Mac TCC: scan recent `console.log` for "Privacy & Security" denials affecting `claude`, `node`, `obsidian`, or `nello`
 - Note any installer prompts that didn't auto-resolve
 
 ## 14. Stale install detection
-- Check for leftover installs at `~/nello-claw/` (Mac/Linux) or `C:\Users\<user>\nello-claw\` (Windows). If one exists AND the current install is somewhere else, flag ⚠ with the cleanup command:
-  - Mac/Linux: `rm -rf ~/nello-claw`
-  - Windows: `Remove-Item -Recurse -Force "$HOME\nello-claw"`
+- Check for leftover installs at `~/nello/` (Mac/Linux) or `C:\Users\<user>\nello\` (Windows). If one exists AND the current install is somewhere else, flag ⚠ with the cleanup command:
+  - Mac/Linux: `rm -rf ~/nello`
+  - Windows: `Remove-Item -Recurse -Force "$HOME\nello"`
   Stale installs cause the wrong scheduled task / LaunchAgent to fire on reboot.
 
 ## 16. Brain backfill (informational)
 - Has `/build-brain` run? Look for `vault/Imports/` (archived ChatGPT/source history). If absent, note "optional - run /build-brain to fold a ChatGPT export + connected tools into the brain". Never ✗; purely informational.
 
 ## 17. Branch / merge gate (only when run from the dev SOURCE repo, not a client install)
-- If this folder is the nello-claw source repo (has `web/`, a `.git` with the GitHub remote): `git rev-parse --abbrev-ref HEAD` and `git status --porcelain`.
+- If this folder is the nello source repo (has `web/`, a `.git` with the GitHub remote): `git rev-parse --abbrev-ref HEAD` and `git status --porcelain`.
 - If new stack work sits on a feature branch (e.g. `feat/v1-telegram-gpt-rtk-selfupdate`) and is NOT merged to `main`, flag ✗: **clients pulling `/update` track `origin/main` and won't receive any of it until the branch merges.** Name the unmerged branch explicitly.
 - On a normal client install this section is N/A - skip silently.
 
@@ -160,7 +160,7 @@ NEXT 3 THINGS TO FIX (priority order):
 
 | Symptom | Likely fix |
 |---------|-----------|
-| Health endpoint times out | Daemon crashed. `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` and recheck `store/server.log` |
+| Health endpoint times out | Daemon crashed. `launchctl kickstart -k gui/$(id -u)/com.nello.server` and recheck `store/server.log` |
 | `(no response)` from chat | Claude Code auth missing. Run `claude` once in terminal to log in. Restart daemon. |
 | Telegram returns 401 | Bot token invalid. Regenerate via `@BotFather` and update `.env` |
 | Telegram not paired / `(no response)` | Run `/connect-telegram` to create a bot and message it once so discovery captures your chat ID. |

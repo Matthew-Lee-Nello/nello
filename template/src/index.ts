@@ -1,5 +1,5 @@
 /**
- * nello-claw daemon entrypoint.
+ * nello daemon entrypoint.
  * Runs the Telegram bot, scheduler, and dashboard under a single process.
  */
 
@@ -60,7 +60,7 @@ function acquireLock(): void {
         // service manager (launchctl/Startup folder/systemd) handles legitimate
         // restarts by stopping the old instance before launching the new one.
         logger.error({ oldPid, pidFile: PID_FILE }, 'another process holds the PID file, refusing to start')
-        process.stderr.write(`\n[nello-claw] PID file ${PID_FILE} is held by process ${oldPid}.\n[nello-claw] If you are certain that is a stale entry pointing at an unrelated PID, remove ${PID_FILE} and rerun.\n[nello-claw] If a real daemon is running, stop it first via your service manager.\n\n`)
+        process.stderr.write(`\n[nello] PID file ${PID_FILE} is held by process ${oldPid}.\n[nello] If you are certain that is a stale entry pointing at an unrelated PID, remove ${PID_FILE} and rerun.\n[nello] If a real daemon is running, stop it first via your service manager.\n\n`)
         process.exit(1)
       }
       // pid not alive → stale lock, safe to overwrite
@@ -75,7 +75,7 @@ function releaseLock(): void {
 }
 
 async function main() {
-  logger.info('nello-claw starting')
+  logger.info('nello starting')
 
   initDatabase()
   acquireLock()

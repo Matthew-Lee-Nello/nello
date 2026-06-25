@@ -1,4 +1,4 @@
-# nello-claw Architecture
+# nello Architecture
 
 ## Two deliverables
 
@@ -49,7 +49,7 @@ template/
 ├── .env.example                   Every env var documented
 ├── .mcp.json.hbs                  MCP config
 ├── claude_desktop_config.json.hbs Desktop app MCP config
-├── com.nello-claw.server.plist.hbs  macOS LaunchAgent
+├── com.nello.server.plist.hbs  macOS LaunchAgent
 ├── brain-context.md.hbs           Auto-injected identity summary
 ├── bootstrap.js                   Install orchestrator
 ├── pnpm-workspace.yaml
@@ -62,7 +62,7 @@ template/
 │   ├── voice-local/               mlx-whisper + Piper
 │   ├── scheduler/                 Cron poller + schedule CLI + morning brief seeder
 │   ├── dashboard/                 Express + WebSocket + React UI (Chat/Cron/Monitoring)
-│   └── audit/                     nello-claw audit + doctor
+│   └── audit/                     nello audit + doctor
 ├── hooks/
 │   ├── inject-brain-context.sh    SessionStart
 │   ├── auto-memory.js             UserPromptSubmit memory capture
@@ -116,7 +116,7 @@ Each preset has a `VAULT-RULES.md` (or `Resource-Vault-Rules.md` for NELLO), an 
 
 - API keys are collected conversationally by the assistant during the INSTALL_GUIDE interview and written to `.env`. They never touch the browser or a NELLO server.
 - Installer reads `<install-folder>/bundle.json`, assembled locally by the assistant from the interview. Never fetched from a server.
-- Keys live in `~/nello-claw/.env` with `chmod 600`. 
+- Keys live in `~/nello/.env` with `chmod 600`. 
 - LaunchAgent runs as user, no privileged access.
 
 ## Extensibility

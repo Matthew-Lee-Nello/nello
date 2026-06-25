@@ -1,4 +1,4 @@
-# nello-claw - Update Guide
+# nello - Update Guide
 
 A command file your assistant follows to update an existing install to the latest version. The install folder is a git clone, so an update is: pull the latest code, rebuild, refresh the configs, run any pending stack migrations, and collect any new key a new tool needs. Nothing personal is lost.
 
@@ -17,7 +17,7 @@ A command file your assistant follows to update an existing install to the lates
 
 ## Step 0 - Locate the install + back up
 
-1. `pwd` and `ls -A`. Confirm `.env`, `bundle.json` and `template/` are here. If not, this is not a nello-claw install folder - ask the user to `cd` into theirs and restart.
+1. `pwd` and `ls -A`. Confirm `.env`, `bundle.json` and `template/` are here. If not, this is not a nello install folder - ask the user to `cd` into theirs and restart.
 2. Back up the files an update may change (timestamp the copies):
    ```bash
    cp .env .env.bak-$(date +%Y%m%d)
@@ -41,9 +41,9 @@ Then restart the daemon (Step 6) and tell the user the exact error you saw. Do n
 ## Step 1 - Stop the daemon
 
 So nothing is running mid-update.
-- **Mac:** `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.nello-claw.server.plist` (ignore "not found")
-- **Windows:** `schtasks /End /TN "com.nello-claw.server"`
-- **Linux:** `systemctl --user stop com.nello-claw.server`
+- **Mac:** `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.nello.server.plist` (ignore "not found")
+- **Windows:** `schtasks /End /TN "com.nello.server"`
+- **Linux:** `systemctl --user stop com.nello.server`
 
 ## Step 2 - Pull the latest code (latest `main`)
 
@@ -107,9 +107,9 @@ If the user doesn't have a key to hand, that's fine: the tool simply stays off u
 
 ## Step 6 - Restart the daemon
 
-- **Mac:** `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nello-claw.server.plist` (or `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server`)
-- **Windows:** `schtasks /Run /TN "com.nello-claw.server"`
-- **Linux:** `systemctl --user start com.nello-claw.server`
+- **Mac:** `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nello.server.plist` (or `launchctl kickstart -k gui/$(id -u)/com.nello.server`)
+- **Windows:** `schtasks /Run /TN "com.nello.server"`
+- **Linux:** `systemctl --user start com.nello.server`
 
 ## Step 7 - Verify
 

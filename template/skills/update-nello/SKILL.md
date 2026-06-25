@@ -1,6 +1,6 @@
 ---
 name: update-nello
-description: Update an existing nello-claw install to the latest version - pull the newest main, rebuild, refresh persona + skills + configs, run any pending stack migrations automatically (e.g. the old Google OAuth -> Composio move), and prompt only for a key that a newly added tool needs. Nothing personal is lost - vault, memory, identity and the Telegram owner lock are all preserved, there is NO re-interview. Use when the user says "/update", "update nello", "update my assistant", "update my install", "check for updates", "am I on the latest version", "pull the latest", "get the new skills", "migrate me to composio".
+description: Update an existing nello install to the latest version - pull the newest main, rebuild, refresh persona + skills + configs, run any pending stack migrations automatically (e.g. the old Google OAuth -> Composio move), and prompt only for a key that a newly added tool needs. Nothing personal is lost - vault, memory, identity and the Telegram owner lock are all preserved, there is NO re-interview. Use when the user says "/update", "update nello", "update my assistant", "update my install", "check for updates", "am I on the latest version", "pull the latest", "get the new skills", "migrate me to composio".
 trigger: /update
 model_hint: reasoning
 ---

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "nello-claw": "./dist/cli.js"
+    "nello": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

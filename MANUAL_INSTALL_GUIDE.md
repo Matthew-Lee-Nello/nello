@@ -1,8 +1,8 @@
-# nello-claw - Manual Install Reference
+# nello - Manual Install Reference
 
 Reference for installing without using the labs.nello.gg wizard. Not a command file.
 
-If you skip the wizard, you fill out the same answers conversationally inside Claude Code. The end result is the same `~/nello-claw/` folder.
+If you skip the wizard, you fill out the same answers conversationally inside Claude Code. The end result is the same `~/nello/` folder.
 
 > **Use Claude Code's Plan Mode** (Shift+Tab twice) when you paste the manual install prompt. Your assistant writes out the steps it intends to take. You read them. You approve, or you don't.
 
@@ -10,7 +10,7 @@ If you skip the wizard, you fill out the same answers conversationally inside Cl
 
 The `labs.nello.gg/wizard` page is just the walkthrough video plus the install prompt to copy. Both paths collect your answers conversationally inside Claude Code; the only difference is which prompt you paste.
 
-Same install, same security model, same `~/nello-claw/` output. See [INSTALL_GUIDE.md](INSTALL_GUIDE.md) for what gets installed and what does not.
+Same install, same security model, same `~/nello/` output. See [INSTALL_GUIDE.md](INSTALL_GUIDE.md) for what gets installed and what does not.
 
 ## Questions you will be asked
 

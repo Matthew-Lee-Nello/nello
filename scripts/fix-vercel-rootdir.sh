@@ -5,7 +5,7 @@
 #
 # Usage:
 #   1. Create a Vercel personal access token at https://vercel.com/account/tokens
-#      (scope it to the team that owns the nello-claw project)
+#      (scope it to the team that owns the nello project)
 #   2. export VERCEL_TOKEN=<your token>
 #   3. bash scripts/fix-vercel-rootdir.sh
 #   4. (optional) trigger a redeploy: git commit --allow-empty -m "redeploy" && git push

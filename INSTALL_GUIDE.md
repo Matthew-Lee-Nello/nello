@@ -1,4 +1,4 @@
-# nello-claw - Install Interview (read this top to bottom, then run it)
+# nello - Install Interview (read this top to bottom, then run it)
 
 **You are Claude Code. This document is your script.** The person who pasted the install prompt is your new owner. You are going to interview them, collect their details and credentials, build their company brain, wire their tools, and stand up their AI assistant end to end. Work through the steps in order. Do not skip ahead.
 
@@ -23,8 +23,8 @@ Read `SECURITY.md` in this repo before you start so you can answer "what is this
    - `git`, `node` (v20+), `pnpm` - required.
    - `claude` (Claude Code CLI) - **required, fatal if missing.** The daemon drives Claude through it. If absent, send them to https://claude.com/claude-code and stop.
    - `graphify` - optional, non-fatal.
-4. **Clone if needed.** If this repo isn't already in the folder: `git clone https://github.com/Matthew-Lee-Nello/nello-claw.git .`
-5. **Build the code** (do this now so the later bootstrap is fast): `pnpm install` then `pnpm -r --filter '!@nello/web' build && pnpm --filter nello-claw-template build`.
+4. **Clone if needed.** If this repo isn't already in the folder: `git clone https://github.com/Matthew-Lee-Nello/nello.git .`
+5. **Build the code** (do this now so the later bootstrap is fast): `pnpm install` then `pnpm -r --filter '!@nello/web' build && pnpm --filter nello-template build`.
 
 Tell them what you found ("Claude Code ✓, Node ✓, installed pnpm for you") and move on.
 
@@ -171,7 +171,7 @@ The persona in `CLAUDE.md` now carries their business. Make the vault match so s
 1. Run **`/install-doctor`** - work the report top to bottom, fix anything red (most common: Claude Code auth, or a missing key).
 2. **Connect their phone.** Tell them to open their new bot in Telegram and send it any message to finish the link - discovery captures the chat ID and the daemon self-restarts. If it doesn't take, run **`/connect-telegram`** to walk through it again.
 3. Hand off: **"Run `/nello-start`"** - it tours what's now running and chains into `/nello-build` to wire their first features.
-4. Point them at two things for later: **`/build-brain`** (imports their exported ChatGPT history + backfills connected tools into the vault) and **`/update`** (pulls the latest nello-claw any time, vault + settings preserved - see [UPDATE_GUIDE.md](UPDATE_GUIDE.md)).
+4. Point them at two things for later: **`/build-brain`** (imports their exported ChatGPT history + backfills connected tools into the vault) and **`/update`** (pulls the latest nello any time, vault + settings preserved - see [UPDATE_GUIDE.md](UPDATE_GUIDE.md)).
 
 ---
 
@@ -182,7 +182,7 @@ The persona in `CLAUDE.md` now carries their business. Make the vault match so s
 - Seeds `vault/` from the chosen preset + creates `vault/Memory/`, `vault/Journal/`.
 - Symlinks `template/skills/*` into `~/.claude/skills/`.
 - Writes a **project-scoped** `.claude/settings.json` (`bypassPermissions` for this folder only - never global) with the hooks.
-- Installs Obsidian.app + `obsidian-cli`, registers the login-item daemon, seeds the morning-brief task, runs `nello-claw audit`.
+- Installs Obsidian.app + `obsidian-cli`, registers the login-item daemon, seeds the morning-brief task, runs `nello audit`.
 
 ## Security (state this plainly if they ask)
 - `bypassPermissions` is **project-scoped** - it lives in `<install-folder>/.claude/settings.json`, not `~/.claude/settings.json`. Other projects keep normal prompts.
@@ -192,15 +192,15 @@ The persona in `CLAUDE.md` now carries their business. Make the vault match so s
 ## Roll back
 ```bash
 # Mac
-launchctl bootout gui/$(id -u)/com.nello-claw.server
+launchctl bootout gui/$(id -u)/com.nello.server
 rm -rf <install-folder>
-rm -f ~/Library/LaunchAgents/com.nello-claw.server.plist
-find ~/.claude/skills -maxdepth 1 -type l -lname '*nello-claw*' -delete
+rm -f ~/Library/LaunchAgents/com.nello.server.plist
+find ~/.claude/skills -maxdepth 1 -type l -lname '*nello*' -delete
 ```
 ```powershell
 # Windows
-schtasks /Delete /F /TN "com.nello-claw.server"
+schtasks /Delete /F /TN "com.nello.server"
 Remove-Item -Recurse -Force "<install-folder>"
 ```
 
-If anything looks wrong, stop and open an issue at github.com/Matthew-Lee-Nello/nello-claw/issues.
+If anything looks wrong, stop and open an issue at github.com/Matthew-Lee-Nello/nello/issues.

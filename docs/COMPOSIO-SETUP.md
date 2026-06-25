@@ -1,6 +1,6 @@
 # Composio Tool Router - the connection layer (NELLO-side setup)
 
-nello-claw connects every OAuth app (Gmail, Calendar, Drive, Docs, Sheets, Slack, Notion, CRMs - 1000+) through one Composio **Tool Router**. No Google Cloud project per client, no per-app MCP, no per-app playbook. Replaces the old `workspace-mcp` + per-client Google OAuth.
+nello connects every OAuth app (Gmail, Calendar, Drive, Docs, Sheets, Slack, Notion, CRMs - 1000+) through one Composio **Tool Router**. No Google Cloud project per client, no per-app MCP, no per-app playbook. Replaces the old `workspace-mcp` + per-client Google OAuth.
 
 ## How it works
 

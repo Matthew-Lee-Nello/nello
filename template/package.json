@@ -1,17 +1,17 @@
 {
-  "name": "nello-claw-template",
+  "name": "nello-template",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Runtime template cloned into the user's ~/nello-claw/ on install",
+  "description": "Runtime template cloned into the user's ~/nello/ on install",
   "scripts": {
     "bootstrap": "node bootstrap.js",
     "build": "pnpm -r build && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "schedule": "pnpm --filter @nello/scheduler exec nc-schedule",
-    "audit": "pnpm --filter @nello/audit exec nello-claw audit",
-    "doctor": "pnpm --filter @nello/audit exec nello-claw doctor",
+    "audit": "pnpm --filter @nello/audit exec nello audit",
+    "doctor": "pnpm --filter @nello/audit exec nello doctor",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"
   },

@@ -10,7 +10,7 @@ import { join, resolve, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { execFile } from 'node:child_process'
 
-const INSTALL = process.env.NC_INSTALL_PATH || join(homedir(), 'nello-claw')
+const INSTALL = process.env.NC_INSTALL_PATH || join(homedir(), 'nello')
 
 // Read stdin payload (JSON from Claude Code hook system)
 let payload = ''

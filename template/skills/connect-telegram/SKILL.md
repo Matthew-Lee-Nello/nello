@@ -26,9 +26,9 @@ One job: set up the assistant on Telegram. The user creates a bot with @BotFathe
    - `ALLOWED_CHAT_ID=` (leave it **empty** - discovery fills it on the first message)
 
 4. **Restart the daemon:**
-   - Mac: `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server`
-   - Linux: `systemctl --user restart com.nello-claw.server`
-   - Windows: `schtasks /End /TN "com.nello-claw.server" & schtasks /Run /TN "com.nello-claw.server"`
+   - Mac: `launchctl kickstart -k gui/$(id -u)/com.nello.server`
+   - Linux: `systemctl --user restart com.nello.server`
+   - Windows: `schtasks /End /TN "com.nello.server" & schtasks /Run /TN "com.nello.server"`
 
 5. **Capture the owner lock.** Tell the user to open their new bot in Telegram and send it any message (e.g. "hi"). The daemon is in discovery mode: it grabs that chat's ID, writes `ALLOWED_CHAT_ID` to `.env`, replies to confirm, and **restarts itself** to load the lock. Wait ~15s, then verify: `grep ALLOWED_CHAT_ID .env` shows a number.
 

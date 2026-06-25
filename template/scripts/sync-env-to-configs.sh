@@ -8,7 +8,7 @@ set -e
 
 # Self-locating: this script lives at <install>/template/scripts/, so the install
 # root is two levels up and bootstrap.js is one level up. Resolving from the script
-# path (not $HOME/nello-claw) means it works wherever the install actually lives.
+# path (not $HOME/nello) means it works wherever the install actually lives.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$INSTALL"

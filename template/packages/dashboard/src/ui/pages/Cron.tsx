@@ -111,9 +111,9 @@ export default function Cron() {
           </div>
         </div>
 
-        {/* NelloClaw tasks */}
+        {/* Nello tasks */}
         <div className="mon-section" style={{ paddingTop: 16 }}>
-          <h3>NelloClaw tasks</h3>
+          <h3>Nello tasks</h3>
           <table className="table">
             <thead>
               <tr>
@@ -219,7 +219,7 @@ export default function Cron() {
               <div>
                 <strong>System cron unavailable</strong>
                 <br />
-                Reading the user crontab isn't supported on {systemCron.platform}. NelloClaw schedules above run regardless.
+                Reading the user crontab isn't supported on {systemCron.platform}. Nello schedules above run regardless.
               </div>
             </div>
           </div>

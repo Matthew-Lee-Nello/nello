@@ -12,8 +12,8 @@
 ## For contributors
 
 ```bash
-git clone https://github.com/Matthew-Lee-Nello/nello-claw.git
-cd nello-claw
+git clone https://github.com/Matthew-Lee-Nello/nello.git
+cd nello
 pnpm install
 pnpm -r build
 ```
@@ -73,7 +73,7 @@ cat > /tmp/test-bundle.json <<'EOF'
 EOF
 
 # Run bootstrap against the test bundle into a temp dir
-NC_INSTALL_PATH=/tmp/nello-claw-test NC_BUNDLE=/tmp/test-bundle.json \
+NC_INSTALL_PATH=/tmp/nello-test NC_BUNDLE=/tmp/test-bundle.json \
   node template/bootstrap.js
 ```
 

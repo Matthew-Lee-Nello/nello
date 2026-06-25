@@ -37,7 +37,7 @@ OPENAI_API_KEY="$OK" ~/.bun/bin/gbrain doctor --fast
 OPENAI_API_KEY="$OK" ~/.bun/bin/gbrain query "<a topic you know is in the vault>" --no-expand
 ```
 - `doctor` reports the page + embedding counts (embeddings should be ≈ pages).
-- `query` should return ranked hits. A 401 / auth error = the OpenAI key is wrong - fix it in `.env` and restart the daemon (`launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` on Mac).
+- `query` should return ranked hits. A 401 / auth error = the OpenAI key is wrong - fix it in `.env` and restart the daemon (`launchctl kickstart -k gui/$(id -u)/com.nello.server` on Mac).
 
 ## Notes
 - The daemon reads `NC_MEMORY_ENGINE` once at boot. If you just added the key, restart the daemon so it starts injecting `[recall]` into replies.

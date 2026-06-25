@@ -35,7 +35,7 @@ export function getDb(): Database.Database {
       while (Date.now() < until) { /* spin */ }
     }
   }
-  logger.error({ err: lastErr }, 'failed to open SQLite after 4 attempts. Try: pkill -f "node.*nello-claw" then rerun')
+  logger.error({ err: lastErr }, 'failed to open SQLite after 4 attempts. Try: pkill -f "node.*nello" then rerun')
   throw lastErr
 }
 

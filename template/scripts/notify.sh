@@ -4,7 +4,7 @@
 
 set -e
 
-ENV_FILE="${NC_INSTALL_PATH:-$HOME/nello-claw}/.env"
+ENV_FILE="${NC_INSTALL_PATH:-$HOME/nello}/.env"
 [ -f "$ENV_FILE" ] || { echo "no .env at $ENV_FILE"; exit 1; }
 
 TOKEN=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | cut -d= -f2- | tr -d '"')

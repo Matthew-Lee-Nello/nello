@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 
-const UPDATE_PROMPT = `I already have NelloClaw installed on this machine and I want to update it to the latest version. Please run the update for me.
+const UPDATE_PROMPT = `I already have Nello installed on this machine and I want to update it to the latest version. Please run the update for me.
 
 First, cd into my existing install folder - the one that has my .env, bundle.json and template/ in it. If you are not already there, find it and move into it. If you cannot find a folder with those three things, stop and ask me where it is. Do not guess.
 
@@ -61,7 +61,7 @@ export default function UpdatePage() {
       <div style={{ marginTop: 24, padding: 20, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--panel)' }}>
         <strong style={{ color: 'var(--accent)' }}>How to run it</strong>
         <p style={{ margin: '8px 0 12px', fontSize: 14 }}>
-          Open Claude Code inside your existing NelloClaw folder (the one with your .env and template/ in it). Paste this prompt. Your assistant reads the update guide, shows you its plan, and checks with you before anything risky.
+          Open Claude Code inside your existing Nello folder (the one with your .env and template/ in it). Paste this prompt. Your assistant reads the update guide, shows you its plan, and checks with you before anything risky.
         </p>
 
         <div className="install-command" onClick={copy} style={{ cursor: 'pointer', whiteSpace: 'pre-wrap' }}>

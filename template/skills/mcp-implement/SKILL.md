@@ -59,9 +59,9 @@ Walk the owner through getting whatever the server needs (API key, OAuth token),
 
 ### Step 6 - Restart the daemon
 The daemon reads `.mcp.json` at start. Restart it so the new server loads:
-- **Mac:** `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server`
-- **Linux:** `systemctl --user restart com.nello-claw.server`
-- **Windows:** the daemon is a plain node process started by the Startup-folder launcher, not a scheduled task. Log out and back in to relaunch it, or kill the node daemon and re-run `nello-claw-daemon.cmd`.
+- **Mac:** `launchctl kickstart -k gui/$(id -u)/com.nello.server`
+- **Linux:** `systemctl --user restart com.nello.server`
+- **Windows:** the daemon is a plain node process started by the Startup-folder launcher, not a scheduled task. Log out and back in to relaunch it, or kill the node daemon and re-run `nello-daemon.cmd`.
 
 ### Step 7 - Verify with a real call (blocking gate)
 - **Terminal Claude Code (the gold standard):** in a fresh session, ToolSearch for the new tool and make one real read-only call. It must return data. This proves the server loads under the same config the daemon uses.

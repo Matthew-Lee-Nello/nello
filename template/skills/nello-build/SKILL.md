@@ -295,7 +295,7 @@ Tell your assistant exactly what you're seeing and it'll walk you through the fi
 
 That's it. You've got an AI COO running on your machine, five workflows wired, your first custom skill scheduled, and a path to the company brain when you're ready.
 
-One more for later: when there's a new version, just say **`/update`** and I'll pull the newest nello-claw onto your machine - your vault, memory and settings stay exactly as they are.
+One more for later: when there's a new version, just say **`/update`** and I'll pull the newest nello onto your machine - your vault, memory and settings stay exactly as they are.
 
 Welcome in.
 

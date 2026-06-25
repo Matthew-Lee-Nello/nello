@@ -59,7 +59,7 @@ const PROVIDERS: Record<string, Doc> = {
       { do: 'Click Get API Key (top right) or go directly to dashboard.exa.ai.' },
       { do: 'Sign up with Google or email.' },
       { do: 'On the dashboard, click API Keys in the left sidebar.' },
-      { do: 'Click Create New Key. Name it "nello-claw".' },
+      { do: 'Click Create New Key. Name it "nello".' },
       { do: 'Copy the key. It starts with random characters.', pasteHere: 'EXA_API_KEY' },
       { do: 'Give it to your assistant when it asks for your Exa key.' },
     ],
