@@ -39,7 +39,7 @@ export async function buildMemoryContext(chatId: string, userMessage: string): P
   }
 
   // Semantic recall from the vault (gbrain). Off unless NC_MEMORY_ENGINE=gbrain
-  // (bootstrap sets it only when a VOYAGE_API_KEY is present). Never throws.
+  // (bootstrap sets it only when an OPENAI_API_KEY is present). Never throws.
   let recall: string[] = []
   if (MEMORY_ENGINE === 'gbrain' && userMessage.trim().length > 2) {
     try {

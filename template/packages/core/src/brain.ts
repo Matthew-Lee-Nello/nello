@@ -9,13 +9,13 @@
  * Ported verbatim in spirit from nello-workspace/src/brain.ts. A hard timeout +
  * a silent fallback means a slow or absent brain NEVER blocks a reply. Gated by
  * NC_MEMORY_ENGINE=gbrain (config MEMORY_ENGINE), which bootstrap only sets when
- * a VOYAGE_API_KEY is present. `gbrain query --no-expand` needs only the Voyage
- * key (it skips the OpenAI expansion/chat models).
+ * an OPENAI_API_KEY is present. gbrain embeds + queries with OpenAI
+ * (text-embedding-3-small), so the key is passed through on the query env.
  */
 import { execFile } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { VOYAGE_API_KEY, OPENAI_API_KEY } from './config.js'
+import { OPENAI_API_KEY } from './config.js'
 
 // Absolute bin + an explicit PATH: the daemon runs under launchd/systemd with a
 // minimal environment, so we cannot rely on the shell PATH finding gbrain. gbrain
@@ -47,7 +47,7 @@ export function gbrainSearch(query: string, k = 4, timeoutMs = 4000): Promise<st
         {
           timeout: timeoutMs,
           maxBuffer: 1024 * 1024,
-          env: { PATH: GBRAIN_PATH, HOME: homedir(), VOYAGE_API_KEY, OPENAI_API_KEY },
+          env: { PATH: GBRAIN_PATH, HOME: homedir(), OPENAI_API_KEY },
         },
         (err, stdout) => {
           if (err || !stdout) return done([])

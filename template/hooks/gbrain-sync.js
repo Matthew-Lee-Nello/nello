@@ -2,7 +2,7 @@
 /**
  * PostToolUse hook - keeps gbrain semantic recall fresh after vault edits.
  *
- * Registered ONLY on a brain-enabled install (a VOYAGE_API_KEY is present), so a
+ * Registered ONLY on a brain-enabled install (an OPENAI_API_KEY is present), so a
  * keyless box never runs this. Mirrors graphify-incremental.js: non-fatal, skips
  * silently if gbrain isn't installed.
  *
@@ -11,7 +11,7 @@
  * same note. `gbrain import` is content-hash incremental, so re-importing the root
  * only embeds the file that actually changed.
  *
- * Cost discipline (keeps Voyage bills sane):
+ * Cost discipline (keeps OpenAI bills sane):
  *  - Skips the Imports/ tree as a TRIGGER - /build-brain dumps thousands of archive
  *    notes there; embedding them is an explicit /build-recall step, not a silent
  *    per-edit side effect.
@@ -37,16 +37,16 @@ try { parsed = JSON.parse(payload) } catch { process.exit(0) }
 const touched = parsed?.tool_input?.file_path
 if (!touched || !touched.endsWith('.md')) process.exit(0)
 
-// Resolve the vault + the Voyage key from .env (same source the daemon reads).
+// Resolve the vault + the OpenAI key from .env (same source the daemon reads).
 const envPath = join(INSTALL, '.env')
 if (!existsSync(envPath)) process.exit(0)
 const envText = readFileSync(envPath, 'utf-8')
 const vaultMatch = envText.match(/^VAULT_PATH=(.+)$/m)
 const vaultPath = vaultMatch ? vaultMatch[1].replace(/^["']|["']$/g, '').trim() : null
 if (!vaultPath) process.exit(0)
-const voyageMatch = envText.match(/^VOYAGE_API_KEY=(.+)$/m)
-const voyageKey = voyageMatch ? voyageMatch[1].replace(/^["']|["']$/g, '').trim() : ''
-if (!voyageKey) process.exit(0)
+const openaiMatch = envText.match(/^OPENAI_API_KEY=(.+)$/m)
+const openaiKey = openaiMatch ? openaiMatch[1].replace(/^["']|["']$/g, '').trim() : ''
+if (!openaiKey) process.exit(0)
 
 function resolveSafely(p) {
   try { return realpathSync(p) } catch { return resolve(p) }
@@ -97,7 +97,7 @@ const PATH = [join(homedir(), '.bun', 'bin'), join(homedir(), '.local', 'bin'),
 execFile(
   GBRAIN_BIN,
   ['import', vaultReal],
-  { detached: true, stdio: 'ignore', env: { PATH, HOME: homedir(), VOYAGE_API_KEY: voyageKey } },
+  { detached: true, stdio: 'ignore', env: { PATH, HOME: homedir(), OPENAI_API_KEY: openaiKey } },
   (err) => {
     try { unlinkSync(lock) } catch { /* already gone */ }
     if (err && process.env.NC_GBRAIN_HOOK_DEBUG) {
