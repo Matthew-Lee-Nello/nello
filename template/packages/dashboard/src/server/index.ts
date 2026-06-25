@@ -6,10 +6,8 @@ import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DASHBOARD_PORT, DASHBOARD_TOKEN, logger, addLogTap } from '@nc/core'
-import { chatRouter } from './routes/chat.js'
 import { cronRouter } from './routes/cron.js'
 import { monitoringRouter } from './routes/monitoring.js'
-import { memoriesRouter } from './routes/memories.js'
 import { daemonsRouter } from './routes/daemons.js'
 import { subs, broadcastLog, type ClientSub } from './ws-broadcast.js'
 
@@ -21,7 +19,7 @@ export interface DashboardHandle {
 }
 
 // Re-export for any consumer that wants to push events from outside the routes.
-export { sendToChat, broadcastLog } from './ws-broadcast.js'
+export { broadcastLog } from './ws-broadcast.js'
 
 // Loopback origins the dashboard frontend is allowed to come from. The CORS
 // middleware uses this list to set headers; the same list backs the Origin
@@ -110,10 +108,12 @@ export function startDashboard(): DashboardHandle {
     res.status(403).json({ error: 'origin not allowed' })
   })
 
-  app.use('/api/chat', chatRouter())
+  // v1.0: chat + memory routes retired (chat -> Telegram, memory -> the vault).
+  // What survives: cron (the Scheduled Tasks tab), monitoring (the Monitor tab +
+  // the /api/monitoring/health gate the self-update verify step polls), and
+  // daemons (the sidebar Telegram-status badge).
   app.use('/api/cron', cronRouter())
   app.use('/api/monitoring', monitoringRouter())
-  app.use('/api/memories', memoriesRouter())
   app.use('/api/daemons', daemonsRouter())
 
   const uiDir = join(__dirname, '..', 'ui')

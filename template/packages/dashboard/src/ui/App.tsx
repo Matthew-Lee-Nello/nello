@@ -1,30 +1,29 @@
 import React, { useEffect, useState, useRef } from 'react'
-import Chat from './pages/Chat'
 import Cron from './pages/Cron'
 import Monitoring from './pages/Monitoring'
-import Memory from './pages/Memory'
 import DaemonStatus from './components/DaemonStatus'
 import { Icon, type IconName } from './components/Icon'
 import { ThemeToggle } from './components/ThemeToggle'
 
-type Page = 'monitoring' | 'chat' | 'memory' | 'schedules'
+// v1.0: the dashboard is a minimal control panel - two tabs only. Chat moved to
+// Telegram; Memory lives in the Obsidian vault. The web UI just schedules tasks
+// and shows health.
+type Page = 'schedules' | 'monitoring'
 
 const STORAGE_KEY = 'nc-last-page'
-const VALID: Page[] = ['monitoring', 'chat', 'memory', 'schedules']
+const VALID: Page[] = ['schedules', 'monitoring']
 
 const NAV: { id: Page; label: string; icon: IconName }[] = [
+  { id: 'schedules', label: 'Scheduled Tasks', icon: 'clock' },
   { id: 'monitoring', label: 'Monitor', icon: 'activity' },
-  { id: 'chat', label: 'Chat', icon: 'message' },
-  { id: 'memory', label: 'Memory', icon: 'database' },
-  { id: 'schedules', label: 'Schedules', icon: 'clock' },
 ]
 
 function initialPage(): Page {
-  if (typeof window === 'undefined') return 'monitoring'
+  if (typeof window === 'undefined') return 'schedules'
   const stored = localStorage.getItem(STORAGE_KEY) as Page | null
   if (stored === ('cron' as Page)) return 'schedules'
-  if (stored === ('courses' as Page)) return 'monitoring'
-  return stored && VALID.includes(stored) ? stored : 'monitoring'
+  // Retired tabs (chat/memory/courses) fall back to Scheduled Tasks.
+  return stored && VALID.includes(stored) ? stored : 'schedules'
 }
 
 function useWs(): boolean {
@@ -75,8 +74,8 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="sb-banner">
-          <img className="banner-dark" src="/nello-labs-banner.png" alt="NELLO Labs" />
-          <img className="banner-light" src="/nello-labs-banner-white.png" alt="NELLO Labs" />
+          <img className="banner-dark" src="/nello-labs-banner.png" alt="Nello" />
+          <img className="banner-light" src="/nello-labs-banner-white.png" alt="Nello" />
         </div>
 
         <div
@@ -123,10 +122,8 @@ export default function App() {
       </aside>
 
       <main className="main">
-        {page === 'monitoring' && <Monitoring />}
-        {page === 'chat' && <Chat />}
-        {page === 'memory' && <Memory />}
         {page === 'schedules' && <Cron />}
+        {page === 'monitoring' && <Monitoring />}
       </main>
     </div>
   )
