@@ -10,7 +10,7 @@ Think of it as one assistant with a few moving parts. They all sit on your own c
 
 **The background helper.** An always-on helper that runs quietly behind the scenes. It's the engine: it's what makes your assistant reply, remember things, and run jobs on a schedule. It starts itself when you turn your computer on, so you never have to launch it.
 
-**Your phone chat.** You talk to your assistant from your phone, through Telegram or WhatsApp (you picked one when you set up). Send it a message, it answers. That's the everyday way you use it.
+**Your phone chat.** You talk to your assistant from your phone, through Telegram. Send it a message, it answers. That's the everyday way you use it.
 
 **The dashboard.** A private web page on your own machine. Open it in your browser at a local address. It's a second place to chat and a window into what's running. It's locked to your computer with a key, so only you can open it.
 
@@ -23,7 +23,7 @@ Think of it as one assistant with a few moving parts. They all sit on your own c
 **The skills.** Ready-made jobs you can ask for by name. A few you'll use:
 - `/update` gets you the latest version
 - `/build-brain` pulls your history into your notes
-- `/connect-whatsapp` links your phone
+- `/connect-telegram` sets up (or re-pairs) your phone chat
 - `/install-doctor` checks everything's healthy
 
 **Comes back on its own.** After a restart or a power-off, all of this starts itself again. You don't relaunch anything.
@@ -50,4 +50,4 @@ Want the full step-by-step with the safety net (how it backs up and how it rolls
 
 - **"Am I on the latest?"** Ask your assistant that, or run `/install-doctor`.
 - **Something not replying?** Run `/install-doctor`. It tells you what's running, what's stuck, and what to do.
-- **Switching from Telegram to WhatsApp (or back)?** Say `/connect-whatsapp` (or `/connect-telegram`) and follow along.
+- **Telegram stopped texting you?** Say `/connect-telegram` and follow along to re-pair it.

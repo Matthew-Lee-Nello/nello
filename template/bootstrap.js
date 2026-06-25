@@ -189,20 +189,14 @@ function buildContext(bundle) {
 function writeEnv(bundle) {
   const keys = { ...(bundle.keys || {}) }
 
-  // Pick-one messaging channel chosen at setup (Telegram OR WhatsApp). Drives which
-  // owner-lock applies and which bot the daemon starts. Precedence: the live .env
-  // value wins (so a post-install /connect-* switch survives a full re-run - keys
-  // carries the .env overlay here), then the explicit bundle field, then inference
-  // from whichever channel's key is present, else telegram. Persisted to .env so the
-  // daemon (config.ts) can refuse the wrong bot even if a stale key lingers.
-  const envChannel = String(keys.MESSAGING_CHANNEL || '').trim().toLowerCase()
-  const channel = (envChannel === 'telegram' || envChannel === 'whatsapp')
-    ? envChannel
-    : (bundle.messagingChannel
-        || (keys.TELEGRAM_BOT_TOKEN ? 'telegram'
-            : keys.WHATSAPP_OWNER_NUMBER ? 'whatsapp'
-            : 'telegram'))
-  keys.MESSAGING_CHANNEL = channel
+  // Messaging channel. Telegram is the only supported surface (WhatsApp retired in
+  // v1.0 - it never linked reliably). Always telegram, regardless of any legacy
+  // bundle/env value, and strip the retired WhatsApp keys so they never linger in
+  // .env. (Migration 0003 also rewrites a stale 'whatsapp' value in bundle.json;
+  // coercing here means a re-run lands on telegram even before migrations run.)
+  keys.MESSAGING_CHANNEL = 'telegram'
+  delete keys.WHATSAPP_OWNER_NUMBER
+  delete keys.WHATSAPP_SESSION_DIR
 
   // Telegram owner lock. The wizard can supply the owner chat ID either as a
   // top-level `telegramChatId` field (PR-7.1) or inside keys.ALLOWED_CHAT_ID
@@ -213,23 +207,17 @@ function writeEnv(bundle) {
   const ownerChatId = String(bundle.telegramChatId ?? keys.ALLOWED_CHAT_ID ?? '').trim()
   if (ownerChatId) keys.ALLOWED_CHAT_ID = ownerChatId
 
-  if (channel === 'whatsapp') {
-    // WhatsApp-only install: Telegram must be fully absent so the daemon can't
-    // enter Telegram discovery (index.ts) and .env carries no empty Telegram noise.
-    // The owner number is captured after install by /connect-whatsapp (QR link).
-    delete keys.TELEGRAM_BOT_TOKEN
-    delete keys.ALLOWED_CHAT_ID
-  } else {
-    // Telegram install: fail closed on an unlocked bot. If a Telegram token ships
-    // but no owner chat ID, discovery.ts does first-message-wins pairing and hands
-    // ownership of a bypassPermissions assistant to whoever messages the bot first.
-    // install.sh asserts this after the fact, but the conversational install runs
-    // bootstrap directly (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard
-    // the invariant here, where every entry path passes through.
-    if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
-      fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
-      process.exit(1)
-    }
+  // Fail closed on an unlocked bot. If a Telegram token ships but no owner chat ID,
+  // discovery.ts does first-message-wins pairing and hands ownership of a
+  // bypassPermissions assistant to whoever messages the bot first. install.sh asserts
+  // this after the fact, but the conversational install runs bootstrap directly
+  // (NC_INSTALL_PATH=… node template/bootstrap.js) — so guard the invariant here,
+  // where every entry path passes through. (A token-less install, e.g. one just
+  // migrated off WhatsApp, passes this and surfaces the token via the missing-key
+  // report; the client pairs it with /connect-telegram, which captures the chat ID.)
+  if (keys.TELEGRAM_BOT_TOKEN && !ownerChatId) {
+    fail('Telegram bot token present but ALLOWED_CHAT_ID / telegramChatId is empty. The bot would ship unlocked (discovery.ts first-message-wins pairing). Re-collect the owner chat ID and re-run.')
+    process.exit(1)
   }
 
   // Semantic recall (gbrain). A VOYAGE_API_KEY is the master switch: when present,

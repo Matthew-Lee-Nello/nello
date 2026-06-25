@@ -19,16 +19,10 @@ export const ALLOWED_CHAT_IDS = (env['ALLOWED_CHAT_ID'] ?? '')
   .map(id => id.trim())
   .filter(id => id.length > 0)
 
-// WhatsApp (optional inbound surface via Baileys - the unofficial WhatsApp Web
-// protocol, a local QR-linked device). Owner-locked to one number; the auth/
-// session state persists under WHATSAPP_SESSION_DIR. Empty number = WhatsApp off.
-export const WHATSAPP_OWNER_NUMBER = (env['WHATSAPP_OWNER_NUMBER'] ?? '').replace(/[^0-9]/g, '')
-export const WHATSAPP_SESSION_DIR = env['WHATSAPP_SESSION_DIR'] || join(PROJECT_ROOT, '.wa-session')
-
-// Pick-one messaging surface chosen at install: 'telegram' or 'whatsapp'. The
-// daemon reads this to start exactly one bot and to refuse Telegram discovery on a
-// WhatsApp install even if a stale token lingers in .env. Empty/legacy = telegram.
-export const MESSAGING_CHANNEL = (env['MESSAGING_CHANNEL'] ?? '').trim().toLowerCase()
+// Messaging surface. Telegram is the only supported channel (WhatsApp retired in
+// v1.0 - it never linked reliably). Kept as an export for back-compat with bundles
+// and configs that still carry the key; the daemon always runs Telegram.
+export const MESSAGING_CHANNEL = (env['MESSAGING_CHANNEL'] ?? 'telegram').trim().toLowerCase()
 
 // Which Claude Code setting scopes the agent loads. Default 'project,user' - 'user'
 // is where the install's skills + CLAUDE.md live, so clients need it. Override to

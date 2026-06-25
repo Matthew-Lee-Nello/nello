@@ -19,10 +19,9 @@ Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 
 ## 2. Env keys (mask values)
 - Read `.env`. List every `KEY=` line. Never print actual key values.
-- **Messaging channel:** read `MESSAGING_CHANNEL` (telegram / whatsapp; empty = legacy telegram). Report it - it decides which messaging checks apply below (§12).
+- **Messaging channel:** Telegram is the only channel (WhatsApp retired in v1.0). If `MESSAGING_CHANNEL=whatsapp` still lingers in `.env`, flag ⚠ "stale WhatsApp channel - run /update to migrate to Telegram, then /connect-telegram".
 - Report `SET` / `MISSING` / `EMPTY` for: `COMPOSIO_API_KEY` (must start `ak_`), `COMPOSIO_MCP_URL` (the minted router URL - EMPTY means Composio provisioning failed at bootstrap), `GOOGLE_USER_EMAIL`, `EXA_API_KEY`, `VAULT_PATH`.
 - **`DASHBOARD_TOKEN` is OPTIONAL** - empty is fine and is the default (no ✗). The dashboard binds `127.0.0.1` (loopback-only) and has an Origin/CSRF guard, so a local install needs no token. Only set it if you expose the dashboard beyond localhost (Tailscale serve / a tunnel); setting it re-enables the auth gate.
-- **Pick-one integrity:** a `telegram` install should have `WHATSAPP_OWNER_NUMBER` empty (and a `whatsapp` install should have `TELEGRAM_BOT_TOKEN` empty). Both populated = ⚠ split-brain; the daemon runs only the chosen one, but clean up the stray.
 
 ## 3. Services (Mac launchd / Win schtasks / Linux systemd)
 - Mac: `launchctl list | grep nello-claw` - report PID + last exit code
@@ -99,17 +98,11 @@ curl -sX POST "http://localhost:3000/api/chat/$CHAT/message" \
 ```
 Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full response. If `reply` is empty/null, the daemon is reachable but the agent is failing - usually Claude Code auth (see step 7).
 
-## 12. Messaging channel test (branch on MESSAGING_CHANNEL from §2)
-
-**If `telegram`:**
-- Read `TELEGRAM_BOT_TOKEN`. `curl -s "https://api.telegram.org/bot<TOKEN>/getMe"` - confirm the bot is alive.
+## 12. Messaging channel test (Telegram)
+- Read `TELEGRAM_BOT_TOKEN`. If EMPTY → ⚠ "run /connect-telegram to create a bot and pair your chat" (expected on a fresh or just-migrated install, not a failure).
+- `curl -s "https://api.telegram.org/bot<TOKEN>/getMe"` - confirm the bot is alive.
 - `ALLOWED_CHAT_ID` non-empty (the owner lock took). If empty, discovery hasn't completed - tell the user to message the bot.
 - `curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates"` - confirm at least one message exists (proves the phone link).
-
-**If `whatsapp`:**
-- `WHATSAPP_OWNER_NUMBER` SET (digits). If EMPTY → ⚠ "run /connect-whatsapp and scan the QR" (expected before linking, not a failure).
-- `ls .wa-session/creds.json` (or `$WHATSAPP_SESSION_DIR`) exists → the device is linked. Missing = QR not scanned yet.
-- `grep -c "whatsapp connected" store/server.log` ≥ 1, and no repeating `Connection Failure` → the socket is live.
 
 ## 13. Permissions / friction
 - Mac: any pending sudo prompts (`sudo -n true`)
@@ -127,7 +120,7 @@ Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full r
 
 ## 17. Branch / merge gate (only when run from the dev SOURCE repo, not a client install)
 - If this folder is the nello-claw source repo (has `web/`, a `.git` with the GitHub remote): `git rev-parse --abbrev-ref HEAD` and `git status --porcelain`.
-- If the WhatsApp / build-brain / channel-choice / update work sits on a feature branch (e.g. `feat/client-stack-v1`) and is NOT merged to `main`, flag ✗: **clients pulling `/update` track `origin/main` and won't receive any of it until the branch merges.** This is the John/Sunita update blocker - name it explicitly.
+- If new stack work sits on a feature branch (e.g. `feat/v1-telegram-gpt-rtk-selfupdate`) and is NOT merged to `main`, flag ✗: **clients pulling `/update` track `origin/main` and won't receive any of it until the branch merges.** Name the unmerged branch explicitly.
 - On a normal client install this section is N/A - skip silently.
 
 ## 15. Summary
@@ -136,7 +129,7 @@ Print:
 ```
 INSTALL DOCTOR REPORT
 =====================
-Channel: telegram | whatsapp
+Channel: telegram
 
 [1]  Install files        ✓ / ✗
 [2]  Env keys             ✓ / ⚠ / ✗
@@ -170,8 +163,7 @@ NEXT 3 THINGS TO FIX (priority order):
 | Health endpoint times out | Daemon crashed. `launchctl kickstart -k gui/$(id -u)/com.nello-claw.server` and recheck `store/server.log` |
 | `(no response)` from chat | Claude Code auth missing. Run `claude` once in terminal to log in. Restart daemon. |
 | Telegram returns 401 | Bot token invalid. Regenerate via `@BotFather` and update `.env` |
-| WhatsApp not linked / `(no response)` | Run `/connect-whatsapp`, scan the QR. If it keeps refusing (`LINK_401`), WhatsApp is throttling - wait, then retry. |
-| WhatsApp answers its own messages | Old build without the echo guard. Rebuild (`pnpm -r build`) and restart the daemon. |
+| Telegram not paired / `(no response)` | Run `/connect-telegram` to create a bot and message it once so discovery captures your chat ID. |
 | Apps won't connect (Composio) | Check `COMPOSIO_API_KEY` + `COMPOSIO_MCP_URL` in `.env`, then re-run `scripts/sync-env-to-configs.sh` |
 | Recall not working / no `[recall]` in replies | `VOYAGE_API_KEY` set? `~/.bun/bin/gbrain --version` works? `~/.bun/bin` on the daemon PATH? `NC_MEMORY_ENGINE=gbrain`? If the key was rejected (Voyage canary 401), rotate it. Re-run bootstrap after fixing the key. |
 | Vault doesn't open in Obsidian | Obsidian not installed. Get it from obsidian.md/download |

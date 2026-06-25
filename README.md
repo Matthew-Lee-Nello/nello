@@ -1,6 +1,6 @@
 # nello-claw
 
-Hosted live-compile Brain Method setup for Skool members. One public website compiles a personalised Claude Code stack (Telegram or WhatsApp bot - your pick - + web dashboard + Obsidian vault + MCPs + skill pack + LaunchAgent) that a user installs on their Mac by pasting one prompt into Claude Code.
+Hosted live-compile Brain Method setup for Skool members. One public website compiles a personalised Claude Code stack (Telegram bot + web dashboard + Obsidian vault + MCPs + skill pack + LaunchAgent) that a user installs on their Mac by pasting one prompt into Claude Code.
 
 Product lives at `labs.nello.gg`.
 
