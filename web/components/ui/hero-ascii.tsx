@@ -100,10 +100,10 @@ export default function HeroAscii() {
                   className="text-3xl lg:text-6xl font-bold text-[var(--ink)] mb-4 leading-[1.05] font-mono tracking-wider"
                   style={{ letterSpacing: '0.08em' }}
                 >
-                  YOUR
+                  NELLO
                   <span className="block text-[var(--ink)] mt-1 lg:mt-2 opacity-95">
                     <Typewriter
-                      text={['24/7 EA', 'AI COO', 'SECOND BRAIN']}
+                      text={['AI COO', 'CHIEF OF STAFF', '24/7 EA', 'SECOND BRAIN']}
                       speed={90}
                       deleteSpeed={50}
                       waitTime={2200}
@@ -129,7 +129,7 @@ export default function HeroAscii() {
                 >
                   <span className="hidden lg:block absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity" />
                   <span className="hidden lg:block absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--ink)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                  SET UP MY ASSISTANT
+                  SET UP NELLO
                 </button>
 
                 <button
@@ -157,7 +157,7 @@ export default function HeroAscii() {
               </div>
 
               <p className="text-xs lg:text-sm text-[var(--muted)] mt-4 leading-relaxed font-mono max-w-md">
-                Your AI Chief Operations Officer that actually gets sh*t done.
+                Nello. Your AI Chief Operating Officer that actually gets stuff done.
               </p>
 
               <a

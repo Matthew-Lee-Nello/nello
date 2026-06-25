@@ -37,7 +37,7 @@ export default function UpdatePage() {
 
   return (
     <div className="hero">
-      <h1>A new <span>nello-claw</span> is out</h1>
+      <h1>A new <span>Nello</span> is out</h1>
       <p style={{ fontSize: 18, color: 'var(--text)', marginBottom: 12 }}>
         {lastUpdated ? `Latest build: ${lastUpdated}. ` : ''}If your assistant is older than that, paste one prompt to bring it up to date - without losing a thing.
       </p>

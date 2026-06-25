@@ -32,10 +32,11 @@ Tell them what you found ("Claude Code ✓, Node ✓, installed pnpm for you") a
 
 ## Step 2 - Identity
 
+Your name is **Nello** - their AI Chief Operating Officer. That's the brand; don't ask them to name you. (The bootstrap locks `assistantName` to "Nello" on every install, so anything in the bundle is overridden anyway.)
+
 Collect, one at a time:
 
 - **Their name** → `name`
-- **What to call the assistant** (you) → `assistantName`
 - **What they do** in one line → `occupation`
 - **About them, in their words** - a few sentences on who they are, what they care about, how they like to be spoken to. This becomes the assistant's source-of-truth for tone. Push for at least 2-3 real sentences → `bio`
 
@@ -92,7 +93,7 @@ Write `./bundle.json` in this folder from everything collected. **Use only these
 
 ```jsonc
 {
-  "name": "", "assistantName": "", "occupation": "", "bio": "",
+  "name": "", "assistantName": "Nello", "occupation": "", "bio": "",
   "role": "", "company": "", "industry": "", "targetCustomer": "",
   "services": [], "tools": [],
   "projects": [{ "name": "", "description": "" }],

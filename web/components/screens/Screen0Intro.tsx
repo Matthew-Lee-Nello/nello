@@ -10,7 +10,7 @@ const EMBED_URL = `https://www.youtube-nocookie.com/embed/${VIDEO_ID}?rel=0&mode
 // in the repo, so we change how the install behaves without ever changing the
 // prompt this page hands out. Claude clones, reads the guide, and runs the
 // interview from there.
-const PASTE_PROMPT = `Install nello-claw for me. Clone https://github.com/Matthew-Lee-Nello/nello-claw into the empty folder VS Code has open, then read SECURITY.md and INSTALL_GUIDE.md and follow INSTALL_GUIDE.md — it's an interview that sets me up end to end. Ask me before anything destructive, and adapt the commands to my operating system.`
+const PASTE_PROMPT = `Install Nello for me. Clone https://github.com/Matthew-Lee-Nello/nello-claw into the empty folder VS Code has open, then read SECURITY.md and INSTALL_GUIDE.md and follow INSTALL_GUIDE.md — it's an interview that sets me up end to end. Ask me before anything destructive, and adapt the commands to my operating system.`
 
 export default function Screen0Intro() {
   const [copied, setCopied] = useState(false)

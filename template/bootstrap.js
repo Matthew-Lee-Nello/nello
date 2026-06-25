@@ -168,6 +168,10 @@ function buildContext(bundle) {
   return {
     ...PERSONA_DEFAULTS,
     ...bundle,
+    // Locked brand: every install's assistant is "Nello" (the AI COO). Forced
+    // after the bundle spread so it wins over any legacy per-install name - a
+    // re-render on /update renames an old custom-named assistant to Nello.
+    assistantName: 'Nello',
     installPath: installPathPosix,
     escapedPath,
     home: toPosixPath(homedir()),
@@ -694,7 +698,7 @@ function createWindowsShortcuts() {
   const args = browser ? `--app=${url}` : ''
 
   for (const shortcutPath of [startMenu, desktop]) {
-    const ps = `$ws=New-Object -ComObject WScript.Shell; $s=$ws.CreateShortcut('${shortcutPath.replace(/'/g, "''")}'); $s.TargetPath='${target.replace(/'/g, "''")}'; $s.Arguments='${args}'; ${iconLine} $s.Description='nello-claw - your AI Chief Operations Officer'; $s.Save();`
+    const ps = `$ws=New-Object -ComObject WScript.Shell; $s=$ws.CreateShortcut('${shortcutPath.replace(/'/g, "''")}'); $s.TargetPath='${target.replace(/'/g, "''")}'; $s.Arguments='${args}'; ${iconLine} $s.Description='Nello - your AI Chief Operating Officer'; $s.Save();`
     try {
       execSync(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, { stdio: 'pipe' })
     } catch (err) {
@@ -1443,7 +1447,7 @@ async function main() {
   console.log(`${ACCENT}Next:${RESET}`)
   console.log(`  1. ${ACCENT}Run /nello-start${RESET} in this terminal (or in the dashboard chat) to begin onboarding`)
   console.log(`     ${DIM}If you don't see it, start a new chat. If you still don't, ask Claude to run it.${RESET}`)
-  console.log(`  2. Open the dashboard above and message your AI COO`)
+  console.log(`  2. Open the dashboard above and message Nello, your AI COO`)
   console.log(`  3. Stuck? Run /install-doctor for a full audit of what's wired\n`)
 }
 

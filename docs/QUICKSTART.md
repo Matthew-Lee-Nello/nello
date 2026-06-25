@@ -32,7 +32,7 @@ Run a local end-to-end install test:
 cat > /tmp/test-bundle.json <<'EOF'
 {
   "name": "Test User",
-  "assistantName": "Ada",
+  "assistantName": "Nello",
   "timezone": "UTC",
   "values": [],
   "communicationStyle": "blunt",

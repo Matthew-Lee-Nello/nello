@@ -43,7 +43,7 @@ export default function AuditPage() {
       }}>
         <strong style={{ color: 'var(--accent)' }}>Step 1 - Install fresh</strong>
         <p style={{ margin: '8px 0 12px', fontSize: 14 }}>
-          Set up your assistant. Pick a clean folder (anything that is not your old project). NelloClaw installs cleanly into it. No conflicts with your existing Claude Code setup, no overwrites.
+          Set up Nello. Pick a clean folder (anything that is not your old project). Nello installs cleanly into it. No conflicts with your existing Claude Code setup, no overwrites.
         </p>
         <Link href="/wizard"><button>Set up my assistant</button></Link>
       </div>
@@ -51,7 +51,7 @@ export default function AuditPage() {
       <div style={{ marginTop: 24, padding: 20, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--panel)' }}>
         <strong style={{ color: 'var(--accent)' }}>Step 2 - After install, consolidate</strong>
         <p style={{ margin: '8px 0 12px', fontSize: 14 }}>
-          Once NelloClaw is running and you have the dashboard open, paste this prompt into Claude Code from inside your new project folder. Your assistant will scan your old setup and offer to import the useful bits one at a time.
+          Once Nello is running and you have the dashboard open, paste this prompt into Claude Code from inside your new project folder. Nello will scan your old setup and offer to import the useful bits one at a time.
         </p>
 
         <div className="install-command" onClick={copy} style={{ cursor: 'pointer', whiteSpace: 'pre-wrap' }}>

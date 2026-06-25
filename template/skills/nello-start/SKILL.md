@@ -69,7 +69,7 @@ Then say:
 
 **Welcome.**
 
-**You did the hardest part already.** You watched the video, got the keys, ran the install, answered the interview. While you were doing all that, your machine quietly turned itself into an AI Chief Operations Officer.
+**You did the hardest part already.** You watched the video, got the keys, ran the install, answered the interview. While you were doing all that, your machine quietly turned itself into Nello - your AI Chief Operating Officer.
 
 Right now, on your computer:
 

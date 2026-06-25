@@ -68,7 +68,7 @@ export default function CompanyBrain() {
       </div>
 
       <p style={{ marginTop: 32, fontSize: 13 }}>
-        Already have your AI COO running? The framework prompt is live in your dashboard - run <code style={{ background: 'var(--accent-dim)', color: 'var(--accent)', padding: '2px 6px', borderRadius: 4 }}>/nello-build</code> any time.
+        Already have Nello running? The framework prompt is live in your dashboard - run <code style={{ background: 'var(--accent-dim)', color: 'var(--accent)', padding: '2px 6px', borderRadius: 4 }}>/nello-build</code> any time.
       </p>
     </div>
   )
