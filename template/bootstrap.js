@@ -308,7 +308,13 @@ function readVersionStamp(installPath) {
 // it must never depend on git, or a migration could re-run every update.
 function writeVersionStamp(installPath, appliedMigrations) {
   const prev = readVersionStamp(installPath)
+  // Read the semver the pulled code ships (repo-root VERSION file). This is the
+  // human-facing version /update announces ("v1.0 -> v1.1"); the git short SHA below
+  // stays as the precise build id. Best-effort - a missing VERSION leaves it null.
+  let version = prev.version ?? null
+  try { version = readFileSync(join(TEMPLATE_DIR, '..', 'VERSION'), 'utf-8').trim() || version } catch {}
   const stamp = {
+    version,
     commit: prev.commit ?? null,
     date: prev.date ?? null,
     stampedAt: new Date().toISOString(),
