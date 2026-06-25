@@ -23,7 +23,7 @@ export interface Provenance {
   time_range?: { from: Date | string; to: Date | string }
   /** When this note was written by the auto-ingest pipeline */
   fetched_at?: Date
-  /** Content hash for dedup — sha256:<hex>. Compute via the @nc/dedup util. */
+  /** Content hash for dedup — sha256:<hex>. Compute via the @nello/dedup util. */
   content_hash?: string
   /** Free-form extra fields (will be serialised in YAML order) */
   [k: string]: unknown

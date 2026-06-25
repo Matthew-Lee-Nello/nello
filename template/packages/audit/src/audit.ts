@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
-import { PROJECT_ROOT, STORE_DIR, VAULT_PATH } from '@nc/core'
+import { PROJECT_ROOT, STORE_DIR, VAULT_PATH } from '@nello/core'
 
 export interface Check {
   name: string

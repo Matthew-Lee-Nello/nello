@@ -1,6 +1,6 @@
 import { readFileSync, renameSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
-import { GROQ_API_KEY } from '@nc/core'
+import { GROQ_API_KEY } from '@nello/core'
 
 /**
  * Transcribe audio via Groq Whisper.
@@ -56,6 +56,6 @@ export async function transcribeAudio(filePath: string): Promise<string> {
 }
 
 export function voiceCapabilities(): { stt: boolean; tts: boolean } {
-  // Online voice = Groq STT only. TTS lives in @nc/voice-local (Piper).
+  // Online voice = Groq STT only. TTS lives in @nello/voice-local (Piper).
   return { stt: !!GROQ_API_KEY, tts: false }
 }

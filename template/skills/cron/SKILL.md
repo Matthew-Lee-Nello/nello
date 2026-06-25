@@ -1,6 +1,6 @@
 ---
 name: cron
-description: Schedule recurring or one-off tasks. Use when the user says "remind me at X", "every Monday at 9 do X", "schedule a task", "every morning brief me", "stop the morning brief", "list my scheduled tasks", "pause that recurring task", or asks anything about cron / scheduled / recurring jobs. Wraps the @nc/scheduler CLI (nc-schedule) so the agent can manage cron tasks through normal Bash calls.
+description: Schedule recurring or one-off tasks. Use when the user says "remind me at X", "every Monday at 9 do X", "schedule a task", "every morning brief me", "stop the morning brief", "list my scheduled tasks", "pause that recurring task", or asks anything about cron / scheduled / recurring jobs. Wraps the @nello/scheduler CLI (nc-schedule) so the agent can manage cron tasks through normal Bash calls.
 model_hint: fast
 ---
 
@@ -8,7 +8,7 @@ model_hint: fast
 
 Schedule a prompt to run on a cron expression. Tasks run in their own chat session, with full tool access (Gmail, Calendar, Obsidian, etc), exactly as if the user had typed the prompt manually.
 
-The scheduler daemon (`@nc/scheduler`) ticks every minute, finds due tasks, and invokes them. The `nc-schedule` CLI does CRUD on the task table.
+The scheduler daemon (`@nello/scheduler`) ticks every minute, finds due tasks, and invokes them. The `nc-schedule` CLI does CRUD on the task table.
 
 ## When to invoke this skill
 
@@ -33,7 +33,7 @@ The scheduler daemon (`@nc/scheduler`) ticks every minute, finds due tasks, and 
 
 ## How to call
 
-The `nc-schedule` binary is installed by `pnpm install` in the install folder. Always run it via Bash from the install folder so the `@nc/core` SQLite db is found.
+The `nc-schedule` binary is installed by `pnpm install` in the install folder. Always run it via Bash from the install folder so the `@nello/core` SQLite db is found.
 
 ### Add
 

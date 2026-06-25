@@ -5,7 +5,7 @@ import {
   runAgent,
   SCHEDULER_POLL_MS,
   logger,
-} from '@nc/core'
+} from '@nello/core'
 
 export type Sender = (chatId: string, text: string) => Promise<void>
 

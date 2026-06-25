@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getTelegramState, pauseTelegram, resumeTelegram, logger } from '@nc/core'
+import { getTelegramState, pauseTelegram, resumeTelegram, logger } from '@nello/core'
 
 export function daemonsRouter(): Router {
   const r = Router()

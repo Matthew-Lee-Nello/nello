@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { execSync } from 'node:child_process'
 import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { listTasks, createTask, setTaskStatus, deleteTask, PROJECT_ROOT } from '@nc/core'
-import { computeNextRun } from '@nc/scheduler'
+import { listTasks, createTask, setTaskStatus, deleteTask, PROJECT_ROOT } from '@nello/core'
+import { computeNextRun } from '@nello/scheduler'
 
 export function cronRouter(): Router {
   const r = Router()

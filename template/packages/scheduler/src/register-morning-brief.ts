@@ -9,7 +9,7 @@
  *   ALLOWED_CHAT_ID        chat ID to deliver to
  */
 
-import { createTask, listTasks } from '@nc/core'
+import { createTask, listTasks } from '@nello/core'
 import { computeNextRun } from './scheduler.js'
 import { randomUUID } from 'node:crypto'
 

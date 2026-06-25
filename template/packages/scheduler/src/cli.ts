@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createTask, listTasks, setTaskStatus, deleteTask } from '@nc/core'
+import { createTask, listTasks, setTaskStatus, deleteTask } from '@nello/core'
 import { computeNextRun } from './scheduler.js'
 import { randomUUID } from 'node:crypto'
 

@@ -11,7 +11,7 @@
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { TELEGRAM_BOT_TOKEN, PROJECT_ROOT, logger } from '@nc/core'
+import { TELEGRAM_BOT_TOKEN, PROJECT_ROOT, logger } from '@nello/core'
 
 const POLL_TIMEOUT_S = 30
 const MAX_WAIT_MS = 30 * 60 * 1000  // 30 min max

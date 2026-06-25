@@ -9,12 +9,12 @@ import {
   initDatabase, runDecaySweep, logger, PROJECT_ROOT, STORE_DIR,
   TELEGRAM_BOT_TOKEN, ALLOWED_CHAT_IDS,
   registerTelegramBot, setTelegramRunning, setTelegramError, isTelegramPaused,
-} from '@nc/core'
-import { createBot, discoverChatId } from '@nc/bot-telegram'
-import { initScheduler, stopScheduler } from '@nc/scheduler'
-import { startDashboard } from '@nc/dashboard/server'
-import * as voiceOnline from '@nc/voice-online'
-import * as voiceLocal from '@nc/voice-local'
+} from '@nello/core'
+import { createBot, discoverChatId } from '@nello/bot-telegram'
+import { initScheduler, stopScheduler } from '@nello/scheduler'
+import { startDashboard } from '@nello/dashboard/server'
+import * as voiceOnline from '@nello/voice-online'
+import * as voiceLocal from '@nello/voice-local'
 
 const PID_FILE = join(STORE_DIR, 'clawd.pid')
 
@@ -115,7 +115,7 @@ async function main() {
     bot = createBot({
       transcribeAudio: transcribe,
       downloadMedia: downloadTelegramMedia,
-      // TTS not wired in online mode. Install @nc/voice-local for Piper TTS.
+      // TTS not wired in online mode. Install @nello/voice-local for Piper TTS.
     })
     registerTelegramBot(bot)
     logger.info({ chats: ALLOWED_CHAT_IDS.length }, 'Telegram bot starting')

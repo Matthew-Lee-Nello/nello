@@ -55,7 +55,7 @@ const NODE_BIN = dirname(NODE)
 // launchd/systemd environment, so this dir MUST be on the service PATH or recall
 // fails "failed to spawn gbrain" (the same Node-on-PATH class of bug as before).
 const BUN_BIN = join(homedir(), '.bun', 'bin')
-// Daemon entry compiled to template/dist/index.js (the @nc/template package
+// Daemon entry compiled to template/dist/index.js (the @nello/template package
 // builds into its own dist/, not the install root). Don't change without also
 // fixing template/package.json's build output path.
 const ENTRY = join(INSTALL, 'template', 'dist', 'index.js')

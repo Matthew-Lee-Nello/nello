@@ -5,7 +5,7 @@ import {
   buildMemoryContext, saveConversationTurn,
   runAgent, cmdNew, cmdCompact, cmdHelp,
   logger, ingestAttachment,
-} from '@nc/core'
+} from '@nello/core'
 import { formatForTelegram, splitMessage } from './format.js'
 
 type VoiceTranscriber = (filePath: string) => Promise<string>
@@ -152,7 +152,7 @@ export function createBot(deps: BotDeps = {}): Bot {
 
   // One path for every media kind: download → file into the vault (transcribing
   // voice) → hand the agent a fragment. Mirrors the WhatsApp side via the shared
-  // ingestAttachment in @nc/core.
+  // ingestAttachment in @nello/core.
   async function ingestAndHandle(
     ctx: Context,
     fileId: string,

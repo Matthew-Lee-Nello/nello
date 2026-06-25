@@ -125,4 +125,4 @@ Users extend via:
 - `/find-skills` to add more skills
 - `/find-mcp` to wire more MCPs
 - `/update-config` to edit settings.json
-- `pnpm --filter @nc/<pkg>` workflows for custom code additions
+- `pnpm --filter @nello/<pkg>` workflows for custom code additions

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir, homedir, platform } from 'node:os'
 import { basename, join } from 'node:path'
-import { logger } from '@nc/core'
+import { logger } from '@nello/core'
 
 function run(cmd: string, args: string[], stdin?: Buffer | string): Promise<{ stdout: Buffer; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {

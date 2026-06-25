@@ -10,28 +10,28 @@ importers:
 
   template:
     dependencies:
-      '@nc/audit':
+      '@nello/audit':
         specifier: workspace:*
         version: link:packages/audit
-      '@nc/bot-telegram':
+      '@nello/bot-telegram':
         specifier: workspace:*
         version: link:packages/bot-telegram
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:packages/core
-      '@nc/dashboard':
+      '@nello/dashboard':
         specifier: workspace:*
         version: link:packages/dashboard
-      '@nc/scheduler':
+      '@nello/scheduler':
         specifier: workspace:*
         version: link:packages/scheduler
-      '@nc/vault-seeder':
+      '@nello/vault-seeder':
         specifier: workspace:*
         version: link:packages/vault-seeder
-      '@nc/voice-local':
+      '@nello/voice-local':
         specifier: workspace:*
         version: link:packages/voice-local
-      '@nc/voice-online':
+      '@nello/voice-online':
         specifier: workspace:*
         version: link:packages/voice-online
       handlebars:
@@ -47,7 +47,7 @@ importers:
 
   template/packages/audit:
     dependencies:
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -63,7 +63,7 @@ importers:
 
   template/packages/bot-telegram:
     dependencies:
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:../core
       grammy:
@@ -113,10 +113,10 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.1.0
         version: 0.1.77(zod@4.3.6)
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:../core
-      '@nc/scheduler':
+      '@nello/scheduler':
         specifier: workspace:*
         version: link:../scheduler
       cors:
@@ -183,7 +183,7 @@ importers:
 
   template/packages/scheduler:
     dependencies:
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:../core
       cron-parser:
@@ -218,7 +218,7 @@ importers:
 
   template/packages/voice-local:
     dependencies:
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -234,7 +234,7 @@ importers:
 
   template/packages/voice-online:
     dependencies:
-      '@nc/core':
+      '@nello/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

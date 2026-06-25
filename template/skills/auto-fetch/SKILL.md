@@ -1,6 +1,6 @@
 ---
 name: auto-fetch
-description: Walk every active MCP connection (Gmail, Calendar, Drive, Slack if connected) and fold new items into the vault with provenance + dedup. Use when triggered by the scheduled auto-fetch task every 20 minutes, or when user says "run auto-fetch", "fetch now", "pull new emails", "/auto-fetch". Reads each connection's per-source cursor, fetches new items since last tick, classifies via @nc/core dedup (skip unchanged, write new, overwrite updated), writes notes with @nc/vault-seeder provenance frontmatter into vault/Inbox/auto-fetch/<source>/<source_id>.md, and appends a one-line entry per item to vault/Inbox.md. Posts a one-line summary on completion.
+description: Walk every active MCP connection (Gmail, Calendar, Drive, Slack if connected) and fold new items into the vault with provenance + dedup. Use when triggered by the scheduled auto-fetch task every 20 minutes, or when user says "run auto-fetch", "fetch now", "pull new emails", "/auto-fetch". Reads each connection's per-source cursor, fetches new items since last tick, classifies via @nello/core dedup (skip unchanged, write new, overwrite updated), writes notes with @nello/vault-seeder provenance frontmatter into vault/Inbox/auto-fetch/<source>/<source_id>.md, and appends a one-line entry per item to vault/Inbox.md. Posts a one-line summary on completion.
 model_hint: fast
 ---
 
@@ -24,7 +24,7 @@ For each enabled MCP connection (decided at runtime — only fetch from what's a
 
 ### 1. Determine the cursor
 
-Read the last `fetched_at` for this source from the dedup index (`@nc/core` `getSeen` — most recent for source). If none, default to "last 24 hours" for first run, otherwise "since last cursor".
+Read the last `fetched_at` for this source from the dedup index (`@nello/core` `getSeen` — most recent for source). If none, default to "last 24 hours" for first run, otherwise "since last cursor".
 
 ### 2. Fetch new items
 
@@ -42,7 +42,7 @@ Cap each source at 50 items per tick. If a source has more, stop at 50 and log "
 For each item, build a stable `source_id` and a `content` string (the body the agent will store), then:
 
 ```js
-import { classify, markSeen } from '@nc/core'
+import { classify, markSeen } from '@nello/core'
 const { verdict, hash, previous } = classify(source, source_id, content)
 ```
 
@@ -64,7 +64,7 @@ Pass the triage verdict back to the user's final summary line so they can see th
 ### 4. Write the note
 
 ```js
-import { noteWithProvenance } from '@nc/vault-seeder'
+import { noteWithProvenance } from '@nello/vault-seeder'
 const body = noteWithProvenance({
   source, source_id, toolkit, scope, time_range, fetched_at, content_hash: hash,
   // extras as needed: sender, subject, channel, etc.

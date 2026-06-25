@@ -1,5 +1,5 @@
 {
-  "name": "@nc/bot-telegram",
+  "name": "@nello/bot-telegram",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nc/core": "workspace:*",
+    "@nello/core": "workspace:*",
     "grammy": "^1.27.0"
   },
   "devDependencies": {

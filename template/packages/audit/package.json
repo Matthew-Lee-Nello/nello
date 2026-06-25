@@ -1,5 +1,5 @@
 {
-  "name": "@nc/audit",
+  "name": "@nello/audit",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nc/core": "workspace:*"
+    "@nello/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",

@@ -24,7 +24,7 @@ Read `SECURITY.md` in this repo before you start so you can answer "what is this
    - `claude` (Claude Code CLI) - **required, fatal if missing.** The daemon drives Claude through it. If absent, send them to https://claude.com/claude-code and stop.
    - `graphify` - optional, non-fatal.
 4. **Clone if needed.** If this repo isn't already in the folder: `git clone https://github.com/Matthew-Lee-Nello/nello-claw.git .`
-5. **Build the code** (do this now so the later bootstrap is fast): `pnpm install` then `pnpm -r --filter '!@nc/web' build && pnpm --filter nello-claw-template build`.
+5. **Build the code** (do this now so the later bootstrap is fast): `pnpm install` then `pnpm -r --filter '!@nello/web' build && pnpm --filter nello-claw-template build`.
 
 Tell them what you found ("Claude Code ✓, Node ✓, installed pnpm for you") and move on.
 

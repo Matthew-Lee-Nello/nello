@@ -9,7 +9,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "dev:web": "pnpm --filter web dev",
-    "dev:dashboard": "pnpm --filter @nc/dashboard dev"
+    "dev:dashboard": "pnpm --filter @nello/dashboard dev"
   },
   "engines": {
     "node": ">=20",

@@ -3,8 +3,8 @@
  * Seed the default auto-fetch scheduled task.
  *
  * One global tick every 20 minutes (configurable). The agent walks each
- * active MCP connection (Gmail, Calendar, Drive, etc), uses @nc/core dedup
- * + @nc/vault-seeder provenance to write new items into vault/Inbox.md, and
+ * active MCP connection (Gmail, Calendar, Drive, etc), uses @nello/core dedup
+ * + @nello/vault-seeder provenance to write new items into vault/Inbox.md, and
  * posts a one-line summary to the chat so the user sees the system breathing.
  *
  * Invoked by the installer bootstrap on first run if enableAutoFetch is true.
@@ -18,7 +18,7 @@
  *                        canonical "run /auto-fetch" instruction below)
  */
 
-import { createTask, listTasks } from '@nc/core'
+import { createTask, listTasks } from '@nello/core'
 import { computeNextRun } from './scheduler.js'
 import { randomUUID } from 'node:crypto'
 

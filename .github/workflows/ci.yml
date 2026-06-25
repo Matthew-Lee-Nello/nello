@@ -18,8 +18,8 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Build the workspace libs first so @nc/core (and the other packages that
+      # Build the workspace libs first so @nello/core (and the other packages that
       # publish types from dist/) resolve. Without this, dependents fail tsc with
-      # "Cannot find module '@nc/core'".
-      - run: pnpm -r --filter '!@nc/web' build
+      # "Cannot find module '@nello/core'".
+      - run: pnpm -r --filter '!@nello/web' build
       - run: pnpm typecheck

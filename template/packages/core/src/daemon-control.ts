@@ -10,7 +10,7 @@
 import { logger } from './logger.js'
 import { TELEGRAM_BOT_TOKEN, ALLOWED_CHAT_IDS } from './config.js'
 
-// Structural type so we don't drag grammy into @nc/core.
+// Structural type so we don't drag grammy into @nello/core.
 // The real bot instance is passed in by template/src/index.ts.
 interface BotLike {
   stop(): Promise<void>

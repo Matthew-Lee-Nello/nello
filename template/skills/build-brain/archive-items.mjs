@@ -9,8 +9,8 @@
  * by note.
  *
  * Reuses the shipped libraries (no new deps):
- *   - @nc/core         classify + markSeen   (the auto_fetch_seen dedup index)
- *   - @nc/vault-seeder noteWithProvenance     (provenance + taxonomy frontmatter)
+ *   - @nello/core         classify + markSeen   (the auto_fetch_seen dedup index)
+ *   - @nello/vault-seeder noteWithProvenance     (provenance + taxonomy frontmatter)
  *
  * Resolution note: this file lives at <install>/template/skills/build-brain/,
  * so bare imports resolve up the tree to <install>/node_modules. Run it with
@@ -31,8 +31,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { classify, markSeen } from '@nc/core'
-import { noteWithProvenance } from '@nc/vault-seeder'
+import { classify, markSeen } from '@nello/core'
+import { noteWithProvenance } from '@nello/vault-seeder'
 
 function die(msg) { process.stderr.write(`archive-items: ${msg}\n`); process.exit(2) }
 

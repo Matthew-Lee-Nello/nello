@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getDb } from '@nc/core'
+import { getDb } from '@nello/core'
 
 const started = Date.now()
 
