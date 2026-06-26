@@ -89,7 +89,7 @@ The installer mints this client's durable router URL (`COMPOSIO_MCP_URL`) from t
 
 ## Step 5 - Assemble `bundle.json`
 
-Write `./bundle.json` in this folder from everything collected. **Use only these keys** - the bootstrap rejects any unknown key and refuses to run:
+Write `./bundle.json` in this folder from everything collected. **Use only these keys.** The bootstrap drops any key it doesn't recognise and warns (it does not stop), so stick to this list and nothing gets silently ignored:
 
 ```jsonc
 {

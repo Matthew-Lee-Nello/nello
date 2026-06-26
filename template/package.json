@@ -1,6 +1,6 @@
 {
   "name": "nello-template",
-  "version": "0.1.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "description": "Runtime template cloned into the user's ~/nello/ on install",

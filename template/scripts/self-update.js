@@ -80,6 +80,9 @@ async function telegram(text) {
 }
 
 function stamp() { return new Date().toISOString().replace(/[:.]/g, '-') }
+// Owner-facing version display: drop a trailing ".0" so the owner sees "v1.3" not "v1.3.0"
+// (storage stays 3-part). Mirrors displayVersion in bootstrap.js; self-update is standalone.
+function dv(v) { return String(v || '').replace(/^v/, '').replace(/\.0$/, '') }
 function verOf(ref) { const r = tryGit(`show ${ref}:VERSION`); return r.ok ? r.out.trim() : null }
 
 // Parse the owner/repo out of an ssh or https git URL and compare EXACTLY to ours.
@@ -279,7 +282,7 @@ function rollback(snap) {
 // ---- NOTIFY mode (the default weekly behaviour) ----
 async function notify(curVer, newVer) {
   const sent = await telegram(
-    `Nello update ready: v${curVer || '?'} -> v${newVer || '?'}.\n\n` +
+    `Nello update ready: v${dv(curVer) || '?'} -> v${dv(newVer) || '?'}.\n\n` +
     `Reply /update (or run it) whenever suits to apply it - it takes a minute and nothing is lost (your notes, memory and identity carry over). ` +
     `Want updates to apply on their own? Set enableAutoUpdate to "auto".`)
   log(sent ? 'notified owner of pending update' : 'pending update (Telegram not configured)')
@@ -329,7 +332,7 @@ async function apply(remoteSha, oldVer, newVer) {
     // start permanently downgrades a good release to notify-only.
     if (!gate.transient) { try { mkdirSync(ROLLBACK_ROOT, { recursive: true }); writeFileSync(LAST_FAILED, remoteSha) } catch {} }
     const tail = restoredOk
-      ? `You're still on your previous working version (v${oldVer || '?'}); nothing was lost.`
+      ? `You're still on your previous working version (v${dv(oldVer) || '?'}); nothing was lost.`
       : `WARNING: the rollback rebuild also failed - please run /update by hand to recover.`
     await telegram(`Nello auto-update was rolled back.\n\nReason: ${gate.why}.\n${tail}\nWe won't retry this same update automatically; a future update will apply normally.`)
     err(`update rolled back: ${gate.why}${restoredOk ? '' : ' (ROLLBACK BUILD ALSO FAILED)'}`)

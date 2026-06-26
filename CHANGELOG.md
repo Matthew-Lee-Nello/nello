@@ -6,6 +6,21 @@ file and stamped into `.nello-version` on every install/update. When you run `/u
 the assistant reads the section(s) between your old version and the new one and tells
 you what changed.
 
+## [1.3.0] - 2026-06
+
+A small, clear release: when you update, Nello now tells you plainly which version you're on.
+
+### Added
+- **Clear "installed" confirmation.** Every `/update` now finishes with a plain
+  `✓ Nello v1.3 installed`, both on screen and on Telegram, so you can see exactly what
+  landed instead of guessing.
+
+### Changed
+- **Simpler version numbers.** Versions read as `v1.3` (not `1.3.0`); a bigger release
+  jumps further (v1.3 to v1.5). Nothing you need to do.
+
+[1.3.0]: https://github.com/Matthew-Lee-Nello/nello/releases/tag/v1.3.0
+
 ## [1.2.0] - 2026-06
 
 Reliability release. v1.1 stopped the email check from quietly running up an OpenAI bill;

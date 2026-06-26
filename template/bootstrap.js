@@ -383,6 +383,13 @@ function readPrevBackupVersion(installPath) {
   return null
 }
 
+// Owner/client-facing version string. Storage stays 3-part semver (1.3.0) so npm + the
+// GitHub release link stay valid, but everything SHOWN drops a trailing ".0" so the owner
+// sees a clean "1.3" not "1.3.0". A real patch (1.3.2) is shown in full.
+function displayVersion(v) {
+  return String(v || '').replace(/^v/, '').replace(/\.0$/, '')
+}
+
 // Numeric semver compare (a<b → -1). Tolerates a leading "v" and missing segments.
 function cmpVer(a, b) {
   const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0)
@@ -440,7 +447,10 @@ function readChangelogRange(fromVersion, toVersion) {
 // markdown literally), AU English, no em dashes. Sections appear only when relevant.
 function composeAnnouncement({ oldVersion, newVersion, changed, caveats, brainMissing, otherMissing, autoFetchOn }) {
   const out = []
-  out.push(oldVersion ? `Nello just updated: v${oldVersion} -> v${newVersion}` : `Nello just updated to v${newVersion}`)
+  // Lead with a clean installed-confirmation, not a sentence: "✓ Nello v1.3 installed".
+  // The old-version context is a quiet second line, only when we know it.
+  out.push(`✓ Nello v${displayVersion(newVersion)} installed`)
+  if (oldVersion) out.push(`Updated from v${displayVersion(oldVersion)}.`)
   if (changed.length) {
     out.push('', 'What changed:')
     for (const c of changed.slice(0, 6)) out.push(`- ${c}`)
@@ -1758,7 +1768,10 @@ async function main() {
   } catch {}
   const chatId = (bundle.keys?.ALLOWED_CHAT_ID ?? '').split(',')[0]?.trim()
 
-  console.log(`\n${ACCENT}✓ Done${RESET}\n`)
+  // Lead the summary with the installed version so /update visibly confirms what landed.
+  let installedVer = ''
+  try { installedVer = displayVersion(readFileSync(join(TEMPLATE_DIR, '..', 'VERSION'), 'utf-8').trim()) } catch {}
+  console.log(`\n${ACCENT}✓ Nello${installedVer ? ` v${installedVer}` : ''} installed${RESET}\n`)
   console.log(`${ACCENT}What's set up:${RESET}`)
   console.log(`  • Dashboard at ${dashboardUrl}${DIM} ${dashboardOpened ? '(opening in your browser...)' : '(open it manually)'}${RESET}`)
   console.log(`  • Obsidian vault at ${vaultPath}${DIM} ${vaultOpened ? '(opening in Obsidian...)' : ''}${RESET}`)

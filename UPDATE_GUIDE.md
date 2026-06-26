@@ -58,7 +58,11 @@ files while they rebuild.)
    git checkout main 2>/dev/null || true
    git pull --ff-only origin main
    ```
-   If the pull is refused because of local edits to tracked files (rare - the generated `.env`, `CLAUDE.md`, `.mcp.json`, `vault/` are all gitignored, so this should not happen), show the user `git status` and ask before doing anything else. Never `git reset --hard` or `git stash -u` here - `stash -u` would sweep up their untracked `.env` and vault.
+   **If the pull is refused** because of a local edit to a tracked product file (this is the old chicken-and-egg that froze ancient installs - client state like `.env`, `CLAUDE.md`, `.mcp.json` and `vault/` is gitignored, so only an edit to a shipped file triggers it), do NOT force it by hand. Run the safe self-merge engine instead:
+   ```bash
+   NC_INSTALL_PATH=$(pwd) node ./template/scripts/self-update.js --salvage-reset
+   ```
+   It checks the remote really is `Matthew-Lee-Nello/nello`, takes a lock + stops the daemon, snapshots `.env`/`bundle.json`/`.mcp.json`/`.nello-version` (and `~/.gbrain`), salvages the tracked-file edits into `client-overlay/quarantine/` (a client-edited shipped skill is also copied into `client-overlay/skills/` so it keeps working), then moves the product files to `origin/main`. Client state is gitignored, so it is never touched. Then continue with Step 3. Never run a raw `git reset --hard` or `git stash -u` by hand - `stash -u` would sweep up the untracked `.env` and vault.
 
 ## Step 3 - Rebuild
 
