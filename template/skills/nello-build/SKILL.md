@@ -102,19 +102,15 @@ Watch your inbox sort itself. Approve the drafts that look right. **You handle u
 
 ### Section 2 - Your dashboard at localhost:3000 + Obsidian as your second brain
 
-**First, the dashboard.** Open your browser to `http://localhost:3000`. That's your AI COO's chat window. It runs on your own machine - your messages never leave your computer except to talk to Claude. From here you can:
+**First, the dashboard.** Open your browser to `http://localhost:3000`. It's your control panel, running on your own machine - two tabs: **Scheduled Tasks** (the recurring jobs Nello runs for you) and **Monitor** (is everything healthy). You don't chat here. You chat with Nello on **Telegram**, and Nello does the work and writes to your vault for you.
 
-- Chat with your assistant (sidebar on the left, message box on the right)
-- Drop files in by drag-and-drop or by clicking the paperclip
-- Watch it work in real time (it streams its replies + shows what tools it's using)
+You don't need to open Obsidian directly to use the second brain. **Your assistant writes to it for you.** You send content to Nello on Telegram, it saves it to the right place in the vault, with the right name.
 
-You don't need to open Obsidian directly to use the second brain. **Your assistant writes to it for you.** You paste content into the chat, the assistant saves it to the right place in the vault, with the right name.
+**2.1. Send a meeting transcript to Nello.**
 
-**2.1. Drop a meeting transcript into the chat.**
+Pick any recent meeting transcript you have. Otter.ai, Fathom, Zoom recap, doesn't matter.
 
-Pick any recent meeting transcript you have. Otterai, Fathom, Zoom recap, doesn't matter.
-
-In the dashboard chat, paste the whole transcript with a one-line lead in:
+Message your Telegram bot with the whole transcript and a one-line lead in:
 
 ```
 Save this meeting with Sarah on 2026-05-12 to my vault.
@@ -122,7 +118,7 @@ Save this meeting with Sarah on 2026-05-12 to my vault.
 <paste the full transcript here>
 ```
 
-The assistant creates a note like `Log-meeting-with-Sarah-2026-05-12.md` in your vault, links it to `[[Person-Sarah]]` if Sarah's already in there, and pulls out any action items. Now ask: "what did we agree on with Sarah?" - it answers from the note.
+The assistant creates a note like `Log-meeting-with-Sarah-2026-05-12.md` in your vault, links it to `[[Person-Sarah]]` if Sarah's already in there, and pulls out any action items. Now ask Nello: "what did we agree on with Sarah?" - it answers from the note.
 
 **2.2. Why the wikilinks matter.**
 

@@ -87,8 +87,8 @@ Right now, on your computer:
   ┌──────────────────────────────────────────────────────────┐
   │                                                          │
   │   DASHBOARD (localhost:3000)                             │
-  │     Your main chat window. Replaces ChatGPT for you.    │
-  │     Knows your business, your inbox, your calendar.     │
+  │     Your control panel: scheduled tasks + health.       │
+  │     You chat with Nello on Telegram, not here.          │
   │                                                          │
   │   OBSIDIAN VAULT                                         │
   │     The brain. Notes, transcripts, decisions, voice.    │
@@ -132,7 +132,7 @@ Plug in any goal. Get a plan back. Approve. Walk away while it runs.
 
 ### Your slash commands (the shortcuts your AI knows)
 
-Slash commands are pre-built workflows your AI already knows how to run. You type `/`, pick one from the menu, and it goes. Works in both the dashboard chat and Claude Code in your terminal.
+Slash commands are pre-built workflows your AI already knows how to run. You type `/`, pick one from the menu, and it goes. Run them in Claude Code in your terminal, or message your Telegram bot.
 
 ```
   ┌──────────────────────────────────────────────────────────┐
@@ -155,8 +155,8 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
 **How to use them:**
 
 1. In **Claude Code** (the terminal app), just type `/` and the menu opens. Pick one, hit enter, it runs.
-2. In the **dashboard chat** at `localhost:3000`, same thing - type `/`, the autocomplete shows up.
-3. **If a slash command doesn't show up**, start a new chat. Claude Code reloads its skills list per session. If it still doesn't show, just ask Claude to run it by name ("run nello-build").
+2. On **Telegram**, message your bot in plain English (or run a command by name, e.g. "run nello-build").
+3. **If a slash command doesn't show up** in Claude Code, start a new chat. Claude Code reloads its skills list per session. If it still doesn't show, just ask Claude to run it by name ("run nello-build").
 
 **If Telegram ever stops texting you:** say **`/connect-telegram`** - it walks you through making a bot with @BotFather, pasting the token, and re-pairing your chat in under a minute.
 
@@ -164,7 +164,7 @@ Slash commands are pre-built workflows your AI already knows how to run. You typ
 
 ### Try one of these right now
 
-First connect your Google apps: say "connect my Gmail and Calendar", click the link your assistant gives you, hit Allow. Ten seconds. Then pick one, copy it, and paste it into the dashboard chat at `localhost:3000` or your Telegram bot. Feel the system work before you go any further.
+First connect your Google apps: say "connect my Gmail and Calendar", click the link your assistant gives you, hit Allow. Ten seconds. Then pick one, copy it, and send it to your Telegram bot (or run it in Claude Code). Feel the system work before you go any further.
 
 ```
   ┌──────────────────────────────────────────────────────────┐

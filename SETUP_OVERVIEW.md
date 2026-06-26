@@ -12,7 +12,7 @@ Think of it as one assistant with a few moving parts. They all sit on your own c
 
 **Your phone chat.** You talk to your assistant from your phone, through Telegram. Send it a message, it answers. That's the everyday way you use it.
 
-**The dashboard.** A private web page on your own machine. Open it in your browser at a local address. It's a second place to chat and a window into what's running. It's locked to your computer with a key, so only you can open it.
+**The dashboard.** A private web page on your own machine. Open it in your browser at a local address. It's your control panel: see the recurring jobs your assistant runs for you and check that everything's healthy. You chat with your assistant on Telegram, not here. It's locked to your computer with a key, so only you can open it.
 
 **Your notes.** A folder of notes your assistant keeps for you: people, projects, clients, decisions, and a daily journal. You can open it in Obsidian and read or edit it yourself any time. These are plain files on your computer. They're yours to keep.
 

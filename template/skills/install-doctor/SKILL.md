@@ -89,16 +89,16 @@ If `OPENAI_API_KEY` IS set:
 - **OpenAI canary (a revoked/expired key fails silently):** `OPENAI_API_KEY="$OK" ~/.bun/bin/gbrain query "test" --no-expand`. A 401/auth error in the output = ✗ "OpenAI key rejected - recall is silently dead; rotate the key in `.env` and restart the daemon". No error (even zero hits) = ✓.
 - **Did the daemon actually pick it up?** `config.ts` reads `NC_MEMORY_ENGINE` once at boot. If the key/engine was added AFTER the daemon started, the doctor sees `gbrain` in `.env` but the live daemon is still on `legacy`. Confirm the daemon was (re)started since the key was set; if unsure, `launchctl kickstart -k gui/$(id -u)/com.nello.server` (Mac) and watch `store/server.log`.
 
-## 11. Chat round-trip test
+## 11. Agent round-trip (does it actually reply?)
 
-First create a real chat (FOREIGN KEY constraint requires the chat to exist):
-```bash
-CHAT=$(curl -sX POST http://localhost:3000/api/chat -H 'Content-Type: application/json' -d '{"name":"doctor-test"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-curl -sX POST "http://localhost:3000/api/chat/$CHAT/message" \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"hi"}'
-```
-Note: the API expects `{"text":"..."}` not `{"message":"..."}`. Print the full response. If `reply` is empty/null, the daemon is reachable but the agent is failing - usually Claude Code auth (see step 7).
+There is **no dashboard chat endpoint** to POST to - chat moved to Telegram, and the dashboard at `localhost:3000` is the Scheduled Tasks + Monitor control panel only. So exercise the agent the way it actually runs:
+
+- **Telegram:** message the bot (step 12) and confirm a reply comes back within ~30s. A reachable daemon that never replies = the agent is failing, almost always Claude Code auth (`~/.claude/.credentials.json` missing - see step 7).
+- **Or read the last scheduled-task result** straight from the DB (no agent turn spent):
+  ```bash
+  sqlite3 store/clawd.db "SELECT id, substr(last_result,1,80), datetime(last_run,'unixepoch') FROM scheduled_tasks ORDER BY last_run DESC LIMIT 3;"
+  ```
+  A `last_result` that starts `error:` (or is empty across every task) = the agent isn't completing runs; check Claude Code auth (step 7) and the tail of `store/server.log`.
 
 ## 12. Messaging channel test (Telegram)
 - Read `TELEGRAM_BOT_TOKEN`. If EMPTY → ⚠ "run /connect-telegram to create a bot and pair your chat" (expected on a fresh or just-migrated install, not a failure).
@@ -145,7 +145,7 @@ Channel: telegram
 [9b] MCP config sane      ✓ / ⚠ / ✗
 [10] Vault state          ✓ / ⚠ / ✗
 [10b] Semantic recall     ✓ / ⚠ / ✗ / n/a (gbrain - only if OPENAI_API_KEY set)
-[11] Chat round-trip      ✓ / ✗
+[11] Agent round-trip     ✓ / ✗
 [12] Messaging channel    ✓ / ⚠ / ✗
 [13] Permissions          ✓ / ⚠
 [14] Stale install paths  ✓ / ⚠

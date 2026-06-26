@@ -24,9 +24,9 @@
 │ template/bootstrap.js   │  Renders every .hbs with the interview values.
 │                         │  Writes CLAUDE.md, .env, .mcp.json.
 │                         │  Seeds vault from chosen preset.
-│                         │  Symlinks 11 skills into ~/.claude/skills/.
+│                         │  Symlinks the skill pack into ~/.claude/skills/.
 │                         │  Merges ~/.claude/settings.json.
-│                         │  Installs LaunchAgent + morning brief.
+│                         │  Installs LaunchAgent + morning brief + auto-fetch.
 └───────────┬─────────────┘
             ▼
 ┌────────────────────────┐
@@ -49,11 +49,13 @@ template/
 ├── .env.example                   Every env var documented
 ├── .mcp.json.hbs                  MCP config
 ├── claude_desktop_config.json.hbs Desktop app MCP config
-├── com.nello.server.plist.hbs  macOS LaunchAgent
 ├── brain-context.md.hbs           Auto-injected identity summary
-├── bootstrap.js                   Install orchestrator
+├── bootstrap.js                   Install orchestrator (generates the LaunchAgent plist
+│                                  + service files inline - they are NOT shipped templates)
 ├── pnpm-workspace.yaml
 ├── src/index.ts                   Daemon entry (wires bot + scheduler + dashboard)
+├── scripts/                       install-service.js, self-update.js, render-configs.js,
+│                                  composio-provision.mjs, release.js, notify.sh
 ├── packages/
 │   ├── core/                      SQLite schema + memory + agent wrapper
 │   ├── vault-seeder/              Renders vault preset into disk
@@ -61,15 +63,18 @@ template/
 │   ├── voice-online/              Groq STT + ElevenLabs TTS
 │   ├── voice-local/               mlx-whisper + Piper
 │   ├── scheduler/                 Cron poller + schedule CLI + morning brief seeder
-│   ├── dashboard/                 Express + WebSocket + React UI (Chat/Cron/Monitoring)
+│   ├── dashboard/                 Express + WebSocket + React UI (Scheduled Tasks + Monitor)
 │   └── audit/                     nello audit + doctor
 ├── hooks/
-│   ├── inject-brain-context.sh    SessionStart
+│   ├── inject-brain-context.js    SessionStart
 │   ├── auto-memory.js             UserPromptSubmit memory capture
-│   ├── graphify-incremental.sh    PostToolUse graph rebuild
-│   ├── statusline.sh              Terminal statusline
-│   └── settings.json.hbs          ~/.claude/settings.json merge source
-├── skills/                        7 bundled Tier 1 skills
+│   ├── graphify-incremental.js    PostToolUse graph rebuild
+│   ├── statusline.js              Terminal statusline
+│   ├── gbrain-sync.js             PostToolUse semantic re-embed (brain installs)
+│   ├── block-dangerous-git.js     PreToolUse git guard
+│   └── stop-beep.js               Stop hook
+├── migrations/                    Idempotent stack migrations (0001-0004), run on /update
+├── skills/                        20 bundled skills (canonical source for the symlinked set)
 └── vault-presets/                 nello / para / zettelkasten / custom
 ```
 
@@ -83,25 +88,35 @@ Three layers, each with a different retention profile:
 
 All three get injected into the session by the SessionStart hook.
 
-## Skill pack (Tier 1, always installed)
+## Skill pack (always installed)
 
-11 skills symlinked into `~/.claude/skills/` by the installer:
+Every directory under `template/skills/` is symlinked into `~/.claude/skills/` by the
+installer (that dir is the source of truth; the set below is current at v1.3 - 20 skills):
 
 | Skill | What it does |
 |-------|--------------|
+| nello-start | First-run orientation - what each piece is, in plain English |
+| nello-build | Guided build of the user's company brain + first workflows |
+| update-nello | `/update` - pull latest, rebuild, run migrations, announce the version |
+| install-doctor | Deep health check of an install (brain, daemon, channel, recall) |
+| diagnose | Triage a specific failure |
+| connect-telegram | Make a bot with @BotFather + pair the owner chat |
+| auto-fetch | The 20-min tick: fold new email/calendar into the vault (code-enforced dedup) |
+| build-brain | Backfill connected tools (+ optional ChatGPT export) into the vault |
+| build-recall | Embed the vault into gbrain semantic recall on demand |
+| triage | Classify an incoming item (drop/ack/react/escalate) |
+| cron | Manage scheduled tasks |
+| research | Parallel multi-source research (Exa/Tavily) |
 | karpathy-guidelines | Clean, minimal code reasoning |
-| find-skills | Discover + install skills |
-| find-mcp | Discover + install MCPs |
-| research | Parallel multi-source research |
-| checkpoint | Save summary before /newchat |
-| think | Structured problem breakdown |
-| self-improving | Agent reflects on mistakes |
-| simplify | Review code for reuse/quality |
-| vault-audit | Check vault against rules |
-| update-config | Edit settings.json safely |
-| fewer-permission-prompts | Build allowlist from transcripts |
+| mcp-implement | Vet + wire a new MCP server end to end |
+| write-skill | Author a new skill |
+| find-skill | Discover an existing skill for a need |
+| to-prd | Turn a request into a PRD |
+| tool-rules | The tool-use rules the agent follows |
+| grill-me | Adversarial self-questioning before a decision |
+| zoom-out | Step back to the bigger picture on a stuck task |
 
-Tier 2 are opt-in during the install interview (mcp-builder, process-transcript, etc.). Tier 3 is plugin markets (andrej-karpathy-skills, caveman) registered in settings.json.
+Plugin markets (andrej-karpathy-skills, agentmemory) are registered in `settings.json`.
 
 ## Vault presets
 
@@ -122,7 +137,7 @@ Each preset has a `VAULT-RULES.md` (or `Resource-Vault-Rules.md` for NELLO), an 
 ## Extensibility
 
 Users extend via:
-- `/find-skills` to add more skills
-- `/find-mcp` to wire more MCPs
-- `/update-config` to edit settings.json
+- `/write-skill` to author a new skill (and `/find-skill` to locate an existing one)
+- `/mcp-implement` to vet + wire a new MCP server
+- a `client-overlay/skills/` dir, whose skills win by name and survive every `/update`
 - `pnpm --filter @nello/<pkg>` workflows for custom code additions

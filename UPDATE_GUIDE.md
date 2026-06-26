@@ -143,7 +143,7 @@ It composes the message from the new `VERSION`, the pre-update `.nello-version.b
 
 ## Step 8 - Reconnect apps (one click each)
 
-Connections run through Composio's one-click links. From the dashboard chat or Telegram, the user says **"connect my Gmail"** (and Calendar, Drive, etc). The assistant calls `COMPOSIO_MANAGE_CONNECTIONS`, hands back a `connect.composio.dev` link, the user clicks Allow. Done. Read, send and create work; delete and trash are blocked. (Only needed the first time, or after a fresh migration onto Composio.)
+Connections run through Composio's one-click links. On Telegram (or in Claude Code), the user says **"connect my Gmail"** (and Calendar, Drive, etc). The assistant calls `COMPOSIO_MANAGE_CONNECTIONS`, hands back a `connect.composio.dev` link, the user clicks Allow. Done. Read, send and create work; delete and trash are blocked. (Only needed the first time, or after a fresh migration onto Composio.)
 
 ## Step 9 - Clean up (optional)
 
