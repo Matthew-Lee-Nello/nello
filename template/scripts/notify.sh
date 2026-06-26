@@ -14,8 +14,14 @@ CHAT_ID=$(grep -E '^ALLOWED_CHAT_ID=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | c
 [ -z "$CHAT_ID" ] && { echo "ALLOWED_CHAT_ID missing"; exit 1; }
 
 MSG="${1:-No message provided}"
-curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+# Capture the API response and verify Telegram actually accepted it. A present-but-wrong
+# token returns 200 with {"ok":false,...}; the old `-s ... >/dev/null; echo sent` reported
+# success on that, so "we sent the update message" was never verified. Fail loudly instead.
+RESP=$(curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
   -d "chat_id=${CHAT_ID}" \
-  --data-urlencode "text=${MSG}" > /dev/null
+  --data-urlencode "text=${MSG}")
 
-echo "sent"
+case "$RESP" in
+  *'"ok":true'*) echo "sent" ;;
+  *) echo "telegram send failed: ${RESP:-no response}" >&2; exit 1 ;;
+esac

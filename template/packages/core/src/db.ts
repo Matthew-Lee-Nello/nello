@@ -127,6 +127,16 @@ export function initDatabase(db: Database.Database = getDb()): void {
     if (!/duplicate column name/i.test(msg)) throw err
   }
 
+  // Migration: consecutive_failures counter for the scheduler circuit-breaker. A task
+  // that errors every tick (e.g. a broken auto-fetch) would otherwise spend an agent
+  // turn forever; after N straight failures the scheduler pauses it. Idempotent add.
+  try {
+    db.exec('ALTER TABLE scheduled_tasks ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (!/duplicate column name/i.test(msg)) throw err
+  }
+
   logger.info('Database initialised')
 }
 
@@ -348,4 +358,19 @@ export function setTaskStatus(id: string, status: 'active' | 'paused'): void {
 
 export function deleteTask(id: string): void {
   getDb().prepare('DELETE FROM scheduled_tasks WHERE id = ?').run(id)
+}
+
+// Circuit-breaker counters. The scheduler bumps on a failed run and resets on a clean
+// one; when the count crosses a threshold it pauses the task so a perpetually-failing
+// job stops burning an agent turn (and any API spend) every tick. bump returns the new
+// count so the caller can decide whether to trip the breaker.
+export function bumpTaskFailure(id: string): number {
+  const row = getDb()
+    .prepare('UPDATE scheduled_tasks SET consecutive_failures = consecutive_failures + 1 WHERE id = ? RETURNING consecutive_failures')
+    .get(id) as { consecutive_failures: number } | undefined
+  return row?.consecutive_failures ?? 0
+}
+
+export function resetTaskFailures(id: string): void {
+  getDb().prepare('UPDATE scheduled_tasks SET consecutive_failures = 0 WHERE id = ?').run(id)
 }

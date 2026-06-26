@@ -103,7 +103,7 @@ export default function HeroAscii() {
                   NELLO
                   <span className="block text-[var(--ink)] mt-1 lg:mt-2 opacity-95">
                     <Typewriter
-                      text={['AI COO', 'CHIEF OF STAFF', '24/7 EA', 'SECOND BRAIN']}
+                      text={['AI COO', '24/7 EA', 'SECOND BRAIN']}
                       speed={90}
                       deleteSpeed={50}
                       waitTime={2200}

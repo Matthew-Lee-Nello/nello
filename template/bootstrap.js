@@ -97,8 +97,20 @@ const MCP_PURPOSES = {
 // a new tool propagate cleanly: ship the tool + add its required key here, and the
 // client's next /update asks for the single new key and nothing else. Optional keys
 // are deliberately NOT listed - an absent optional key just leaves its feature
-// gated off, exactly as today. `where`/`hint` give the skill the prompt copy.
+// gated off, exactly as today. (The one exception is the brain's OPENAI_API_KEY: v1.1
+// lists it so every install is offered the recall upgrade - see the `brain` entry.)
+// `where`/`hint` give the skill the prompt copy.
 const KEY_MANIFEST = {
+  // Semantic recall (the "brain"). v1.1 makes this a first-class capability every
+  // install should have, so - unlike other optional keys - its key IS listed here.
+  // A keyless install now surfaces OPENAI_API_KEY in --report-missing-keys, so the
+  // /update interview-diff prompts for it: THE change that lets an ancient install
+  // pick up the OpenAI (ChatGPT) brain instead of silently staying on legacy FTS.
+  // Suppressible with bundle.enableRecall=false for a client who wants no brain at all.
+  brain: {
+    enabled: (ctx) => ctx.enableRecall !== false,
+    required: [{ key: 'OPENAI_API_KEY', where: 'platform.openai.com/api-keys', hint: 'starts with sk-' }],
+  },
   composio: {
     enabled: (ctx) => !!ctx.mcps.composio,
     required: [{ key: 'COMPOSIO_API_KEY', where: 'dashboard.composio.dev', hint: 'starts with ak_' }],
@@ -330,6 +342,148 @@ function writeVersionStamp(installPath, appliedMigrations) {
   } catch {}
 }
 
+// ---------- post-update announcement (`node bootstrap.js --announce`) ----------
+// The "Big Nello" message: after an update lands, tell the owner over Telegram what
+// changed, the ONE thing they must do (e.g. paste the OpenAI key so memory works), the
+// auto-fetch cost + how to switch it off, and that nothing personal was touched. Driven
+// off the data the update already produced (the new VERSION, the pre-update backup, the
+// CHANGELOG, the missing-key report), so it fires deterministically regardless of how
+// the assistant phrased its own summary. Send is best-effort: if Telegram isn't wired,
+// the message still prints to stdout for the skill to show.
+
+// The semver this install was on BEFORE the pull, read from the newest pre-update
+// backup the /update skill leaves (`.nello-version.bak-<ts>`). Null if none (an ancient
+// install from before versioning) → the announcement degrades to "updated to v<new>".
+function readPrevBackupVersion(installPath) {
+  try {
+    const baks = readdirSync(installPath).filter(f => f.startsWith('.nello-version.bak-')).sort()
+    for (let i = baks.length - 1; i >= 0; i--) {
+      try {
+        const v = JSON.parse(readFileSync(join(installPath, baks[i]), 'utf-8')).version
+        if (v) return String(v)
+      } catch {}
+    }
+  } catch {}
+  return null
+}
+
+// Numeric semver compare (a<b → -1). Tolerates a leading "v" and missing segments.
+function cmpVer(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0)
+  const pb = String(b).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0)
+    if (d) return d < 0 ? -1 : 1
+  }
+  return 0
+}
+
+// Pull the CHANGELOG bullets + caveats for every released version in (from, to]. With
+// `from` null, just the newest (== to) entry. Keep-a-Changelog shape: `## [x.y.z]`
+// headers, `### Caveats` sections, `- ` bullets.
+function readChangelogRange(fromVersion, toVersion) {
+  const changed = []
+  const caveats = []
+  let text = ''
+  try { text = readFileSync(join(TEMPLATE_DIR, '..', 'CHANGELOG.md'), 'utf-8') } catch { return { changed, caveats } }
+  // Strip markdown that renders literally in a plain-text Telegram message.
+  const clean = (s) => s.replace(/\*\*/g, '').replace(/`/g, '').replace(/\s+/g, ' ').trim()
+  const lines = text.split('\n')
+  let curVer = null
+  let inCaveats = false
+  let bucket = null   // the list the current bullet belongs to
+  let cur = null      // accumulating multi-line bullet text
+  const flush = () => { if (cur && bucket) bucket.push(clean(cur)); cur = null; bucket = null }
+  for (const line of lines) {
+    const head = line.match(/^##\s*\[([0-9][0-9.]*)\]/)
+    if (head) { flush(); curVer = head[1]; inCaveats = false; continue }
+    if (!curVer) continue
+    // In range = newer than the old version (or all, if old unknown) and not newer than new.
+    const inRange = (fromVersion ? cmpVer(curVer, fromVersion) > 0 : cmpVer(curVer, toVersion) === 0)
+      && cmpVer(curVer, toVersion) <= 0
+    if (!inRange) { flush(); continue }
+    const sub = line.match(/^###\s+(.+?)\s*$/)
+    if (sub) { flush(); inCaveats = /caveat/i.test(sub[1]); continue }
+    const bullet = line.match(/^[-*]\s+(.+?)\s*$/)
+    if (bullet) {
+      flush()
+      cur = bullet[1]
+      bucket = inCaveats ? caveats : changed
+    } else if (cur && line.trim() && !line.startsWith('[')) {
+      // Continuation of a wrapped bullet (indented or plain follow-on line).
+      cur += ' ' + line.trim()
+    } else {
+      flush()
+    }
+  }
+  flush()
+  return { changed, caveats }
+}
+
+// Compose the plain-text Telegram message. Plain text only (notify.sh / Telegram render
+// markdown literally), AU English, no em dashes. Sections appear only when relevant.
+function composeAnnouncement({ oldVersion, newVersion, changed, caveats, brainMissing, otherMissing, autoFetchOn }) {
+  const out = []
+  out.push(oldVersion ? `Nello just updated: v${oldVersion} -> v${newVersion}` : `Nello just updated to v${newVersion}`)
+  if (changed.length) {
+    out.push('', 'What changed:')
+    for (const c of changed.slice(0, 6)) out.push(`- ${c}`)
+  }
+  if (brainMissing) {
+    out.push('', 'One thing to do:',
+      'Open your .env file and paste your OpenAI key after OPENAI_API_KEY= so Nello\'s memory works. Get one at platform.openai.com (it starts with sk-). That is the only step.')
+  } else if (otherMissing.length) {
+    const m = otherMissing[0]
+    out.push('', 'One thing to do:', `Add ${m.key} to your .env (from ${m.where}) to switch ${m.tool} on.`)
+  }
+  if (autoFetchOn) {
+    out.push('', 'Heads up, this costs a little:',
+      'Nello checks your email about every 20 minutes and files it into your memory. When your brain is on (OpenAI key set) that uses a small amount of OpenAI credit. To stop it, run: nello autofetch off')
+  }
+  const realCaveats = caveats.filter(c => !/openai|auto.?fetch/i.test(c))
+  if (realCaveats.length) {
+    out.push('', 'Also note:')
+    for (const c of realCaveats.slice(0, 4)) out.push(`- ${c}`)
+  }
+  out.push('', 'Your notes, memory and identity are untouched. No re-interview.')
+  return out.join('\n')
+}
+
+// Best-effort Telegram send via the owner lock already in .env. OS-agnostic (Node
+// fetch, not the bash notify.sh) so /update announces the same on Windows. Returns
+// whether Telegram accepted it (ok:true) so a rejected/absent token reads as "not sent".
+async function sendTelegramMessage(env, text) {
+  const token = env.TELEGRAM_BOT_TOKEN
+  const chatId = String(env.ALLOWED_CHAT_ID || '').split(',')[0].trim()
+  if (!token || !chatId) return false
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(8000),
+    })
+    const j = await res.json().catch(() => ({}))
+    return !!j.ok
+  } catch { return false }
+}
+
+async function runAnnounce(ctx) {
+  const newVersion = readVersionStamp(INSTALL_PATH).version || ''
+  const oldVersion = readPrevBackupVersion(INSTALL_PATH)
+  // Already announced this version? The skill may call --announce more than once; only
+  // re-send if the version actually moved (or we have no record).
+  const { changed, caveats } = readChangelogRange(oldVersion, newVersion)
+  const missing = missingRequiredKeys(ctx)
+  const brainMissing = missing.find(m => m.key === 'OPENAI_API_KEY')
+  const otherMissing = missing.filter(m => m.key !== 'OPENAI_API_KEY')
+  const autoFetchOn = ctx.enableAutoFetch !== false
+  const msg = composeAnnouncement({ oldVersion, newVersion, changed, caveats, brainMissing, otherMissing, autoFetchOn })
+  const sent = await sendTelegramMessage(ctx.env, msg)
+  console.log('\n' + msg + '\n')
+  console.log(sent ? `${ACCENT}(sent to Telegram)${RESET}` : `${DIM}(Telegram not configured - message shown above only)${RESET}`)
+}
+
 // Patch bundle.json in place, applying only a structural mutation (e.g. flip an
 // mcps flag), without touching keys. Migrations use this to make a change durable:
 // the in-memory bundle drives THIS run's render, but the next run reloads
@@ -391,15 +545,21 @@ async function runMigrations(bundle) {
     catch (e) { warn(`migration ${mod.id} detect() threw, skipping: ${e.message?.split('\n')[0] || e}`); continue }
 
     if (needed) {
+      let res
       try {
         info(`Migration ${mod.id}${mod.description ? ` - ${mod.description}` : ''}`)
-        await mod.run(mctx)
-        ran++
+        res = await mod.run(mctx)
       } catch (e) {
         // Leave it UNRECORDED so the next /update retries it; don't block the others.
         fail(`migration ${mod.id} failed (will retry next update): ${e.message?.split('\n')[0] || e}`)
         continue
       }
+      // A migration can return { defer: true } when its precondition isn't met yet -
+      // e.g. 0002 needs an OPENAI_API_KEY that /update only collects later this same
+      // run. Leave it UNRECORDED (not a failure, no scary log) so it re-evaluates and
+      // completes on the pass where the precondition holds.
+      if (res && res.defer) continue
+      ran++
     }
     // Record both "ran" and "not applicable here" so it's never re-evaluated.
     applied.add(mod.id)
@@ -1049,6 +1209,8 @@ const BUNDLE_KNOWN_KEYS = new Set([
   'mcps', 'keys',
   'installLaunchAgent', 'enableMorningBrief', 'morningBriefPrompt', 'morningBriefCron',
   'enableAutoFetch', 'autoFetchCron',
+  // v1.1: brain on/off (default on), and weekly unattended self-update on/off (default on).
+  'enableRecall', 'enableAutoUpdate',
   'telegramChatId',
   // Pick-one messaging channel chosen at install: "telegram" or "whatsapp".
   'messagingChannel',
@@ -1060,8 +1222,14 @@ function validateBundle(bundle) {
   }
   for (const key of Object.keys(bundle)) {
     if (!BUNDLE_KNOWN_KEYS.has(key)) {
-      fail(`bundle.json contains unknown key: ${JSON.stringify(key)}. Refusing to proceed. Re-assemble bundle.json from the install interview (INSTALL_GUIDE.md Step 5).`)
-      process.exit(1)
+      // Fail OPEN on forward-compat. An ancient bundle.json may carry a since-retired
+      // field; hard-exiting here froze the whole /update before any migration could
+      // run (a non-technical owner can't hand-edit JSON to recover). Drop the unknown
+      // key and warn instead - it's inert (buildContext only reads known fields and is
+      // regenerated downstream), so dropping it is strictly safer than keeping it. The
+      // TYPE spot-checks below still hard-fail on the real injection surface.
+      warn(`bundle.json has an unrecognised key ${JSON.stringify(key)} - dropping it (likely a retired field from an older version; the update continues).`)
+      delete bundle[key]
     }
   }
   // Spot-check shapes for fields that get interpolated into paths or configs.
@@ -1110,8 +1278,9 @@ function validateVaultPath(vaultPath) {
 
 async function main() {
   // --report-missing-keys emits pure JSON to stdout (the /update skill parses it),
-  // so keep the banner out of its output. Every other path prints it.
-  if (!process.argv.includes('--report-missing-keys')) console.log(BANNER)
+  // and --announce emits the owner-facing Telegram message; keep the banner out of
+  // both. Every other path prints it.
+  if (!process.argv.includes('--report-missing-keys') && !process.argv.includes('--announce')) console.log(BANNER)
 
   if (!existsSync(BUNDLE_PATH)) {
     fail(`bundle not found at ${BUNDLE_PATH}`)
@@ -1124,8 +1293,11 @@ async function main() {
   // prompt for just the missing keys, write them to .env, re-render. No writes,
   // no migrations, no provisioning, no stale-install scan.
   const REPORT_MISSING = process.argv.includes('--report-missing-keys')
+  // Read-only: compose + send the post-update "what changed / one thing to do" Telegram
+  // message and exit. No migrations, no provisioning, no writes.
+  const ANNOUNCE = process.argv.includes('--announce')
 
-  if (!CONFIGS_ONLY && !REPORT_MISSING) detectStaleInstalls()
+  if (!CONFIGS_ONLY && !REPORT_MISSING && !ANNOUNCE) detectStaleInstalls()
 
   const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8'))
   validateBundle(bundle)
@@ -1146,7 +1318,7 @@ async function main() {
   // (-> bundle.json via patchBundle), so they must run BEFORE the Composio provision
   // and buildContext below, where those values are read.
   let appliedMigrations
-  if (!CONFIGS_ONLY && !REPORT_MISSING) {
+  if (!CONFIGS_ONLY && !REPORT_MISSING && !ANNOUNCE) {
     appliedMigrations = await runMigrations(bundle)
   }
 
@@ -1154,7 +1326,7 @@ async function main() {
   // Tool Router URL from it automatically (destructiveHint disabled = no delete/trash),
   // so nobody pastes a URL. Skip if one was already provided (wizard pre-provisioned),
   // and skip entirely for the read-only --report-missing-keys query (no network call).
-  if (!REPORT_MISSING && bundle.keys?.COMPOSIO_API_KEY && !bundle.keys?.COMPOSIO_MCP_URL) {
+  if (!REPORT_MISSING && !ANNOUNCE && bundle.keys?.COMPOSIO_API_KEY && !bundle.keys?.COMPOSIO_MCP_URL) {
     const userId = bundle.keys.COMPOSIO_USER_ID || bundle.keys.GOOGLE_USER_EMAIL
     if (!userId) {
       fail('COMPOSIO_API_KEY set but no COMPOSIO_USER_ID / GOOGLE_USER_EMAIL to key the connections to.')
@@ -1177,6 +1349,12 @@ async function main() {
   // stop. Read-only - no vault validation, no stamp, no file writes.
   if (REPORT_MISSING) {
     process.stdout.write(JSON.stringify(missingRequiredKeys(ctx)) + '\n')
+    return
+  }
+
+  // --announce: compose + send the post-update Telegram message and stop. Read-only.
+  if (ANNOUNCE) {
+    await runAnnounce(ctx)
     return
   }
 

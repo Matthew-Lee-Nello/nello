@@ -1,12 +1,18 @@
 // 0002-voyage-to-openai-embeddings
 //
 // v1.0 moved gbrain off Voyage (voyage-3.5-lite, 1024-dim) onto OpenAI
-// (text-embedding-3-small, 1536-dim). The stored vectors are at the OLD dimension,
-// so a query embedded at 1536 can't compare against a 1024 store - the brain has to
-// be re-embedded. `gbrain import` is content-hash incremental and won't re-embed on
-// a model change alone (the note content is unchanged), so we clear the gbrain store
-// here; configureGbrain + seedRecall later in THIS same bootstrap re-init it on the
-// OpenAI model and rebuild fresh at 1536.
+// (text-embedding-3-small, 1536-dim). Stored vectors at the OLD dimension can't be
+// compared against a 1536 query, and `gbrain import` is content-hash incremental so a
+// model change alone won't re-embed. The store therefore has to be cleared so
+// configureGbrain + seedRecall (later in THIS same bootstrap) rebuild it fresh on the
+// OpenAI model.
+//
+// The hard rule: NEVER wipe a brain we can't rebuild. Rebuilding needs OPENAI_API_KEY,
+// and an ancient install won't have one yet. So when the key is absent we leave the
+// existing (Voyage / old-dimension) store intact and DEFER - the key is now collected
+// by /update's missing-key prompt (it's in KEY_MANIFEST as `brain`), and this migration
+// re-evaluates and completes on the pass where the key is present. The old brain keeps
+// working until then; it is never left wiped-and-empty.
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -14,29 +20,39 @@ import { homedir } from 'node:os'
 const GBRAIN_DIR = join(homedir(), '.gbrain')
 const GBRAIN_CFG = join(GBRAIN_DIR, 'config.json')
 
+const TARGET_DIM = 1536
+
 export default {
   id: '0002-voyage-to-openai-embeddings',
   description: 're-embed the brain on OpenAI (was Voyage; dimension 1024 -> 1536)',
 
-  // Only an install whose gbrain store was built on Voyage needs the rebuild. A
-  // fresh install (no store) or one already on OpenAI returns false = no-op.
+  // Migrate any store that isn't already on the v1.1 target. That's a Voyage store OR
+  // any store at a dimension other than 1536 (catches a half-switched install whose
+  // config points at OpenAI but whose vectors are still 1024). A fresh install (no
+  // store) returns false: configureGbrain builds it at 1536 from the start, nothing to do.
   detect() {
     try {
       if (!existsSync(GBRAIN_CFG)) return false
       const cfg = JSON.parse(readFileSync(GBRAIN_CFG, 'utf-8'))
-      return typeof cfg.embedding_model === 'string' && cfg.embedding_model.startsWith('voyage')
+      const model = typeof cfg.embedding_model === 'string' ? cfg.embedding_model : ''
+      const dims = Number(cfg.embedding_dimensions)
+      return model.startsWith('voyage') || dims !== TARGET_DIM
     } catch { return false }
   },
 
   run(ctx) {
-    // Wipe the Voyage-dimension store + config so setupRecall (later this bootstrap)
-    // re-inits gbrain on openai:text-embedding-3-small/1536 and re-imports the vault
-    // fresh. Best-effort: a failure just leaves recall empty until /build-recall.
-    try { rmSync(GBRAIN_DIR, { recursive: true, force: true }) } catch {}
     if (!ctx.env.OPENAI_API_KEY) {
-      ctx.warn('Brain was on Voyage; v1.0 uses OpenAI. Add OPENAI_API_KEY to .env and run /build-recall to switch recall back on.')
-    } else {
-      ctx.ok('brain store cleared for OpenAI re-embed (rebuilds this run; a large vault: run /build-recall)')
+      // No key yet -> can't re-embed -> do NOT wipe. Keep the existing brain working
+      // and defer. /update collects OPENAI_API_KEY via the missing-key prompt, then
+      // re-runs bootstrap; this migration completes on that pass.
+      ctx.warn('Brain is on the old embedding model; v1.1 uses OpenAI (text-embedding-3-small/1536). Add OPENAI_API_KEY to .env (platform.openai.com) and Nello re-embeds automatically. Your current brain keeps working until then.')
+      return { defer: true }
     }
+    // Key present: clear the old-dimension store so configureGbrain + seedRecall
+    // (later this same bootstrap) re-init gbrain on openai:text-embedding-3-small/1536
+    // and re-import the vault fresh. Best-effort: a failure just leaves recall empty
+    // until /build-recall.
+    try { rmSync(GBRAIN_DIR, { recursive: true, force: true }) } catch {}
+    ctx.ok('brain store cleared for OpenAI re-embed (rebuilds this run; a large vault: run /build-recall)')
   },
 }

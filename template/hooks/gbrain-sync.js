@@ -58,10 +58,13 @@ if (touchedReal !== vaultReal && !touchedReal.startsWith(vaultReal + sep)) proce
 
 // Don't let the bulk/auto-generated trees TRIGGER a sync (the cost guard). Imports/
 // is the /build-brain backfill (embed it explicitly); Memory/Journal are churny
-// auto-notes already covered by FTS.
+// auto-notes already covered by FTS; Inbox/ + Inbox.md are the auto-fetch landing
+// zone - letting every scraped email fire a whole-vault re-embed is the runaway
+// OpenAI-spend path. These still get embedded by the next bootstrap/build-recall
+// pass, just not on every single write.
 const rel = touchedReal.slice(vaultReal.length + 1)
 const top = rel.split(sep)[0]
-if (top === 'Imports' || top === 'Memory' || top === 'Journal' || top === '.obsidian' || top === '.git') process.exit(0)
+if (top === 'Imports' || top === 'Memory' || top === 'Journal' || top === 'Inbox' || top === 'Inbox.md' || top === '.obsidian' || top === '.git') process.exit(0)
 
 // Debounce: one import per 10s, and never two at once (PGLite is single-writer).
 // A whole-vault import catches every change since the last run, so skipping a

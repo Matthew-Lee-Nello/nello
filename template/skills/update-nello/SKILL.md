@@ -38,15 +38,27 @@ One job: bring a clone up to the newest `main`, rebuild, re-render the configs/p
 8. **Verify** (Guide Step 7). Run `/install-doctor`. Spot-check that `node ./template/bootstrap.js --report-missing-keys` is `[]`, `.mcp.json` no longer has `google_workspace`/`workspace-mcp`, `.nello-version` lists the applied migrations, and (if just migrated) `COMPOSIO_MCP_URL` is in `.env`. Open the dashboard - no Google OAuth prompt should appear.
 9. **Reconnect apps, one click each.** The user says **"connect my Gmail"** (and Calendar, Drive, etc) in chat or Telegram; that calls `COMPOSIO_MANAGE_CONNECTIONS`, hands back a `connect.composio.dev` link, they click Allow. Read/send/create work; delete and trash stay blocked (Guide Step 8).
 
-## End - announce what changed
+## End - announce what changed (auto-sent to Telegram)
 
-Don't just say "done". Tell the user the version they moved across and what's new:
+The announcement is now produced by code, not by hand, so it is consistent and actually
+reaches the owner. After the daemon is back up and `--report-missing-keys` is drained,
+run the announce step exactly once:
 
-1. **Read the old version** from the pre-update backup: `grep '"version"' .nello-version.bak-* 2>/dev/null | tail -1` (or the value you captured before the pull). Read the **new** version: `cat VERSION`.
-2. **Pull the changelog** for that range from `CHANGELOG.md` - the section(s) between the old version and the new one. Summarise each in plain language (the `### Caveats` lines especially - those are the "heads up" items).
-3. **Say it in a few lines:** "Nello updated v<old> -> v<new>. What changed: <2-4 plain bullets>. Heads up: <any caveats>." Then: their vault + memory + identity are intact (no re-interview), and the "connect my Gmail" next step if Composio was just wired.
+```bash
+NC_INSTALL_PATH=$(pwd) node ./template/bootstrap.js --announce
+```
 
-If `.nello-version` had no version (an install from before versioning), just say "updated to v<new>" and summarise the latest CHANGELOG entry. Backups (`.env.bak-*`, `bundle.json.bak-*`, `.mcp.json.bak-*`, `.nello-version.bak-*`) can be deleted once everything works (Step 9).
+This reads the new `VERSION`, the pre-update `.nello-version.bak-*` (old version), the
+`CHANGELOG.md` range, and the live missing-key report, then **sends the owner a Telegram
+message**: what changed, the one thing they must do (e.g. paste the OpenAI key so memory
+works), the auto-fetch cost + how to switch it off (`nello autofetch off`), and that their
+vault/memory/identity are untouched. It also prints the same message to stdout - show that
+to the user in chat too. If Telegram isn't wired yet, it prints `(Telegram not configured)`
+and you relay the printed message yourself.
+
+Then, in chat, add the one human touch the script can't: the **"connect my Gmail"** next
+step if Composio was just wired. Backups (`.env.bak-*`, `bundle.json.bak-*`,
+`.mcp.json.bak-*`, `.nello-version.bak-*`) can be deleted once everything works (Step 9).
 
 ## Rules
 

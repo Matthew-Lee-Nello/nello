@@ -127,6 +127,16 @@ If the user doesn't have a key to hand, that's fine: the tool simply stays off u
 - If the install just moved onto Composio, also confirm the router minted: `grep -q '^COMPOSIO_MCP_URL=.\+' .env && echo "router URL minted OK"`.
 - Open the dashboard at http://localhost:3000 and send a message. No Google OAuth prompt should appear.
 
+## Step 7b - Announce what changed (auto-sent to Telegram)
+
+Once the daemon is healthy and `--report-missing-keys` is `[]` (or the user has skipped a key), send the post-update announcement exactly once:
+
+```bash
+NC_INSTALL_PATH=$(pwd) node ./template/bootstrap.js --announce
+```
+
+It composes the message from the new `VERSION`, the pre-update `.nello-version.bak-*`, the `CHANGELOG.md` range and the live missing-key report, then sends the owner a Telegram message: what changed, the one thing to do (e.g. paste the OpenAI key so memory works), the auto-fetch cost + how to turn it off (`nello autofetch off`), and that nothing personal was touched. It also prints the same text to stdout - show that in chat. If Telegram is not wired yet it prints `(Telegram not configured)` and you relay the printed message.
+
 ## Step 8 - Reconnect apps (one click each)
 
 Connections run through Composio's one-click links. From the dashboard chat or Telegram, the user says **"connect my Gmail"** (and Calendar, Drive, etc). The assistant calls `COMPOSIO_MANAGE_CONNECTIONS`, hands back a `connect.composio.dev` link, the user clicks Allow. Done. Read, send and create work; delete and trash are blocked. (Only needed the first time, or after a fresh migration onto Composio.)

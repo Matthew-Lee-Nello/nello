@@ -11,6 +11,8 @@ Audit the nello install from inside the install folder. Print a readable report 
 
 Run from the install folder (the one that has `CLAUDE.md`, `.env`, `vault/`).
 
+**Fast path:** `node ./template/packages/audit/dist/cli.js doctor --deep` (or `nello doctor --deep` if the bin is on PATH) runs the machine checks - brain key + gbrain embedding model/dimension, and every scheduled task's cron - in one shot, exiting non-zero if the brain is dead or a cron is misbehaving. Use it first, then work the sections below for anything it flags.
+
 ## 1. Install files
 - `ls -la ./`
 - Confirm these all exist: `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.env`, `.claude/settings.json`, `vault/`, `store/`, `dist/`, `node_modules/`, `template/skills/`

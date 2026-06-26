@@ -6,6 +6,44 @@ file and stamped into `.nello-version` on every install/update. When you run `/u
 the assistant reads the section(s) between your old version and the new one and tells
 you what changed.
 
+## [1.1.0] - 2026-06
+
+Reliability release. Fixes the brain carry-forward so an older install actually moves
+onto the OpenAI memory when you `/update`, ends every update with a clear Telegram
+message, and stops auto-fetch from quietly running up an OpenAI bill.
+
+### Added
+- **Update message on Telegram.** Every `/update` now finishes with a plain-English note:
+  what changed, the one thing you need to do (usually nothing), and a reminder that your
+  notes and memory are untouched.
+- **`nello doctor --deep`.** One command checks the things that actually break - is the
+  memory on OpenAI, is any scheduled task running too often - and tells you how to fix it.
+- **`nello autofetch on|off`.** Turn the every-20-minute email check on or off whenever
+  you want.
+
+### Changed
+- **Your memory now upgrades itself on `/update`.** Older installs are asked for an
+  OpenAI key (if they don't have one) and the memory rebuilds on the new model. Before,
+  an old install could finish updating with its memory silently switched off.
+- **Auto-fetch is cheaper and tidier.** Filing your email into memory no longer re-scans
+  everything each time, repeat emails are no longer re-saved, and a stuck task now pauses
+  itself instead of running forever.
+
+### Migrations (run automatically on `/update`)
+- `0002` re-embeds the brain on OpenAI **safely** - it never wipes a working memory it
+  can't rebuild. If no OpenAI key is set yet, your current memory keeps working and the
+  rebuild happens automatically once you add the key.
+
+### Caveats
+- **The brain runs on OpenAI.** If you want memory on, Nello asks for your `OPENAI_API_KEY`
+  during `/update` (one paste, from platform.openai.com). Without it, memory stays off and
+  everything else still works.
+- **Auto-fetch uses a little OpenAI credit.** Checking your email every ~20 minutes and
+  filing it into memory costs a small amount. It stays on by default; run
+  `nello autofetch off` any time to stop it.
+
+[1.1.0]: https://github.com/Matthew-Lee-Nello/nello/releases/tag/v1.1.0
+
 ## [1.0.0] - 2026-06
 
 The Nello release. Your assistant is now **Nello**, your AI Chief Operating Officer.

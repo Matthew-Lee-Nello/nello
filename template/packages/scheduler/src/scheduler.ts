@@ -2,12 +2,17 @@ import cronParser from 'cron-parser'
 const { parseExpression } = cronParser
 import {
   claimDueTasks, releaseTask, recoverStaleClaims,
+  bumpTaskFailure, resetTaskFailures, setTaskStatus,
   runAgent,
   SCHEDULER_POLL_MS,
   logger,
 } from '@nello/core'
 
 export type Sender = (chatId: string, text: string) => Promise<void>
+
+// Circuit-breaker: after this many consecutive failed runs, pause the task so a broken
+// job (a wedged auto-fetch, a revoked token) stops spending an agent turn every tick.
+const MAX_CONSECUTIVE_FAILURES = 5
 
 export function computeNextRun(cronExpression: string, from: Date = new Date()): number {
   try {
@@ -43,6 +48,7 @@ export function initScheduler(send: Sender): void {
       const due = claimDueTasks()
       for (const task of due) {
         let resultText: string
+        let failed = false
         try {
           logger.info({ id: task.id, prompt: task.prompt.slice(0, 80) }, 'Running task')
           const result = await runAgent(task.prompt)
@@ -52,6 +58,7 @@ export function initScheduler(send: Sender): void {
           const msg = err instanceof Error ? err.message : String(err)
           logger.error({ id: task.id, err }, 'Task failed')
           resultText = `error: ${msg}`
+          failed = true
         }
         // Release the claim, bump next_run, record result. Done last so a crash
         // mid-run leaves the lease in place — recoverStaleClaims on next boot
@@ -61,6 +68,23 @@ export function initScheduler(send: Sender): void {
           releaseTask(task.id, computeNextRun(task.schedule), resultText.slice(0, 500))
         } catch (relErr) {
           logger.error({ id: task.id, relErr }, 'Failed to release task claim')
+        }
+        // Circuit-breaker: trip after MAX_CONSECUTIVE_FAILURES straight failures so a
+        // broken task stops burning an agent turn (and any API spend) every tick.
+        // Guarded so a counter/DB hiccup can't abort the rest of the batch.
+        try {
+          if (failed) {
+            const fails = bumpTaskFailure(task.id)
+            if (fails >= MAX_CONSECUTIVE_FAILURES) {
+              setTaskStatus(task.id, 'paused')
+              logger.warn({ id: task.id, fails }, 'Circuit-breaker tripped — task paused')
+              await send(task.chat_id, `Paused scheduled task ${task.id} after ${fails} failures in a row, to stop wasted runs. Fix the cause, then re-enable it in the dashboard (Scheduled Tasks).`)
+            }
+          } else {
+            resetTaskFailures(task.id)
+          }
+        } catch (cbErr) {
+          logger.error({ id: task.id, cbErr }, 'Circuit-breaker bookkeeping failed')
         }
       }
     } catch (err) {

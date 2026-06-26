@@ -63,12 +63,22 @@ export function getSeen(source: string, source_id: string): SeenRecord | null {
  */
 export type DedupVerdict = 'new' | 'unchanged' | 'updated'
 
+// Provenance lines that are re-stamped on every fetch even when the underlying item
+// is byte-identical. If they fed the dedup hash, the SAME email would re-classify as
+// 'updated' every tick -> re-written -> re-embedded forever (the auto-fetch "scraping
+// my email every 10 min, destroying my API" storm). Strip them before hashing so the
+// verdict reflects the real content, not the clock.
+const VOLATILE_PROVENANCE = /^\s*(fetched_at|retrieved_at|tick_at|time_range|fetched|updated_at)\s*:.*$/gim
+function stableContent(content: string): string {
+  return content.replace(VOLATILE_PROVENANCE, '').replace(/\n{2,}/g, '\n').trim()
+}
+
 export function classify(source: string, source_id: string, content: string): {
   verdict: DedupVerdict
   hash: string
   previous: SeenRecord | null
 } {
-  const hash = contentHash(content)
+  const hash = contentHash(stableContent(content))
   const previous = getSeen(source, source_id)
   if (!previous) return { verdict: 'new', hash, previous: null }
   if (previous.content_hash === hash) return { verdict: 'unchanged', hash, previous }

@@ -18,7 +18,7 @@
  *                        canonical "run /auto-fetch" instruction below)
  */
 
-import { createTask, listTasks } from '@nello/core'
+import { createTask, listTasks, deleteTask } from '@nello/core'
 import { computeNextRun } from './scheduler.js'
 import { randomUUID } from 'node:crypto'
 
@@ -41,9 +41,34 @@ if (!cron || !chatId) {
   process.exit(1)
 }
 
-const existing = listTasks(chatId).find(t => t.prompt === prompt && t.schedule === cron)
-if (existing) {
-  console.log(`Auto-fetch already registered as ${existing.id}`)
+// Canonical single auto-fetch task. Match EVERY auto-fetch task for this chat (any
+// era - they all run "/auto-fetch"), not an exact prompt+schedule pair. The old
+// exact-match dedup let a stale row survive (e.g. an ancient */10 cron that kept
+// scraping email and burning the API) AND stacked a second task beside it on every
+// update. Converge to exactly one canonical task no matter what the preserved store
+// carried in.
+const AUTO_FETCH_SIGNATURE = '/auto-fetch'
+const existing = listTasks(chatId).filter(t => t.prompt.includes(AUTO_FETCH_SIGNATURE))
+
+// Respect an explicit opt-out. If the owner paused auto-fetch (dashboard or
+// `nello autofetch off`), don't resurrect it - keep one paused row, drop any dupes.
+const paused = existing.find(t => t.status === 'paused')
+if (paused) {
+  for (const t of existing) if (t.id !== paused.id) { deleteTask(t.id); console.log(`Removed duplicate auto-fetch task ${t.id} (${t.schedule})`) }
+  console.log(`Auto-fetch is paused (${paused.id}); leaving it off. Run \`nello autofetch on\` to resume.`)
+  process.exit(0)
+}
+
+// No pause: keep at most the one matching the current canonical prompt+cron, delete
+// the rest (stale schedules, duplicates, retired prompts).
+const canonical = existing.find(t => t.prompt === prompt && t.schedule === cron)
+for (const t of existing) {
+  if (canonical && t.id === canonical.id) continue
+  deleteTask(t.id)
+  console.log(`Removed stale/duplicate auto-fetch task ${t.id} (${t.schedule})`)
+}
+if (canonical) {
+  console.log(`Auto-fetch already registered as ${canonical.id} (${cron})`)
   process.exit(0)
 }
 
