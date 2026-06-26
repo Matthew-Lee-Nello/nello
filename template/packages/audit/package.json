@@ -13,7 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nello/core": "workspace:*"
+    "@nello/core": "workspace:*",
+    "@nello/vault-seeder": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",

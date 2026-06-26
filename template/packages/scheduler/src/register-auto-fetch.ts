@@ -18,7 +18,7 @@
  *                        canonical "run /auto-fetch" instruction below)
  */
 
-import { createTask, listTasks, deleteTask } from '@nello/core'
+import { createTask, listTasks, deleteTask, getMeta } from '@nello/core'
 import { computeNextRun } from './scheduler.js'
 import { randomUUID } from 'node:crypto'
 
@@ -49,6 +49,18 @@ if (!cron || !chatId) {
 // carried in.
 const AUTO_FETCH_SIGNATURE = '/auto-fetch'
 const existing = listTasks(chatId).filter(t => t.prompt.includes(AUTO_FETCH_SIGNATURE))
+
+// Durable opt-out: `nello autofetch off` writes a DB tombstone that outlives both a
+// deleted bundle.json and a deleted task row. If the owner turned auto-fetch off and
+// then deleted the row (dashboard delete, not the supported `off`), an /update re-seed
+// would otherwise resurrect it. Honour the tombstone: clean up any stragglers, seed nothing.
+try {
+  if (getMeta('autofetch_optout') === '1') {
+    for (const t of existing) { deleteTask(t.id); console.log(`Removed auto-fetch task ${t.id} (owner opted out)`) }
+    console.log('Auto-fetch is opted out (`nello autofetch off`); not seeding. Run `nello autofetch on` to resume.')
+    process.exit(0)
+  }
+} catch { /* no db / fresh install — fall through to normal seeding */ }
 
 // Respect an explicit opt-out. If the owner paused auto-fetch (dashboard or
 // `nello autofetch off`), don't resurrect it - keep one paused row, drop any dupes.

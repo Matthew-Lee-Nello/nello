@@ -50,6 +50,11 @@ function git(args, opts = {}) {
   return execSync(`git ${args}`, { cwd: INSTALL, stdio: ['ignore', 'pipe', 'pipe'], ...opts }).toString().trim()
 }
 function tryGit(args) { try { return { ok: true, out: git(args) } } catch (e) { return { ok: false, out: e.stderr?.toString() || e.message } } }
+// Argv form (no shell) for paths that may contain spaces or quotes — never string-interpolate a path into a shell.
+function gitArgs(args) {
+  const r = spawnSync('git', args, { cwd: INSTALL, encoding: 'utf-8' })
+  return { ok: r.status === 0, out: (r.stdout || '') }
+}
 
 function readEnvVal(key) {
   try {
@@ -77,11 +82,19 @@ async function telegram(text) {
 function stamp() { return new Date().toISOString().replace(/[:.]/g, '-') }
 function verOf(ref) { const r = tryGit(`show ${ref}:VERSION`); return r.ok ? r.out.trim() : null }
 
+// Parse the owner/repo out of an ssh or https git URL and compare EXACTLY to ours.
+// A substring check (the old `.includes`) would accept a tampered remote like
+// `github.com/attacker/Matthew-Lee-Nello-nello-mirror` and then `reset --hard` onto it.
+function remoteMatches(url) {
+  const m = String(url).match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?\s*$/)
+  return !!m && m[1].toLowerCase() === EXPECTED_REMOTE.toLowerCase()
+}
+
 // --- preflight: refuse to touch a repo that isn't ours ---
 function preflight() {
   if (!existsSync(join(INSTALL, '.git'))) { err(`${INSTALL} is not a git repo - cannot self-update. Re-clone from github.com/${EXPECTED_REMOTE}.`); process.exit(2) }
   const remote = tryGit('remote get-url origin')
-  if (!remote.ok || !remote.out.includes(EXPECTED_REMOTE)) {
+  if (!remote.ok || !remoteMatches(remote.out)) {
     err(`origin is ${remote.out || 'unset'}, not ${EXPECTED_REMOTE}. Refusing to reset onto an unknown remote.`)
     process.exit(2)
   }
@@ -119,16 +132,22 @@ function snapshot() {
 // --- salvage client edits to tracked product files, then reset to origin/main ---
 // Returns the number of edits set aside, so the caller can tell the owner.
 function salvageAndReset() {
-  const status = tryGit('status --porcelain --untracked-files=no').out
-  const edited = status.split('\n').map(l => l.slice(3).trim()).filter(Boolean)
+  // NUL-delimited names vs HEAD: handles paths with spaces, renames, and Windows
+  // backslashes (the old `status --porcelain` + `slice(3)` silently lost those, so a
+  // client edit to such a path was discarded by the reset with no recoverable patch).
+  const edited = gitArgs(['diff', '-z', '--name-only', 'HEAD']).out.split('\0').map(s => s.trim()).filter(Boolean)
   if (edited.length) {
     const qdir = join(INSTALL, 'client-overlay', 'quarantine', stamp())
     mkdirSync(qdir, { recursive: true })
     for (const f of edited) {
-      const diff = tryGit(`diff -- "${f}"`).out
-      if (diff) { try { writeFileSync(join(qdir, f.replace(/[\/]/g, '__') + '.patch'), diff) } catch {} }
+      // Salvage BEFORE the reset, per file, each guarded so one failure can't abort the
+      // rest (or leave the reset to discard an unsalvaged edit). Argv form — never shell.
+      try {
+        const diff = gitArgs(['diff', 'HEAD', '--', f]).out
+        if (diff) writeFileSync(join(qdir, f.replace(/[/\\]/g, '__') + '.patch'), diff)
+      } catch {}
       // A client-edited shipped skill survives as a standalone overlay skill.
-      const m = f.match(/^template\/skills\/([^/]+)\//)
+      const m = f.match(/^template[/\\]skills[/\\]([^/\\]+)[/\\]/)
       if (m) {
         const dst = join(INSTALL, 'client-overlay', 'skills', m[1])
         try { mkdirSync(dst, { recursive: true }); cpSync(join(INSTALL, 'template', 'skills', m[1]), dst, { recursive: true }) } catch {}
@@ -183,18 +202,47 @@ function daemon(action) {
 // in place, a live gbrain query must not 401 - that catches a brain the update broke
 // (rotated/rejected key, bad config) without false-failing on an absent/environmental
 // gbrain or an empty store (a query on an empty store returns no hits, not an error).
-async function verifyGate(buildOk) {
+async function verifyGate(buildOk, expectedVersion, brainExpected) {
   if (!buildOk) return { ok: false, why: 'build failed' }
   const port = readEnvVal('DASHBOARD_PORT') || '3000'
-  let healthy = false
-  for (let i = 0; i < 30; i++) {
-    try { if ((await fetch(`http://127.0.0.1:${port}/api/monitoring/health`, { signal: AbortSignal.timeout(2000) })).ok) { healthy = true; break } } catch {}
+  // 90s budget (was 30): a slow client box doing a fresh build + restart can take well
+  // over 30s to bind. A health timeout here is TRANSIENT — see the caller: we still roll
+  // back to be safe, but we do NOT blacklist the commit, so it retries next week instead
+  // of being permanently downgraded to notify-only for being slow once.
+  let health = null
+  for (let i = 0; i < 90; i++) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/monitoring/health`, { signal: AbortSignal.timeout(2000) })
+      if (res.ok) { health = await res.json().catch(() => ({})); break }
+    } catch {}
     await new Promise(r => setTimeout(r, 1000))
   }
-  if (!healthy) return { ok: false, why: 'daemon did not become healthy within 30s' }
+  if (!health) return { ok: false, why: 'daemon did not become healthy within 90s', transient: true }
+
+  // Freshness check: we just stopped + started the daemon, so a healthy one MUST have a
+  // small uptime. A large uptime means the restart didn't take and a stale old-code daemon
+  // is still answering. This is the signal the version compare alone can't give on a
+  // same-version push (a bug-fix commit that didn't bump VERSION). Generous threshold so a
+  // slow build can't false-fail; a stale daemon on an established box has been up for hours.
+  if (typeof health.uptime_s === 'number' && health.uptime_s > 600) {
+    return { ok: false, why: `daemon uptime ${health.uptime_s}s - it did not restart onto the new build` }
+  }
+  // Build-stamp assert: the daemon reports the VERSION it booted from. If it's answering
+  // with a DIFFERENT version than the one we just reset to, the restart didn't take and a
+  // stale old-code daemon is still serving. A daemon too old to report a version (pre-1.2)
+  // returns undefined: the uptime check above still covers it, so don't fail on the version.
+  if (expectedVersion && health.version && health.version !== expectedVersion) {
+    return { ok: false, why: `daemon still serving v${health.version}, expected v${expectedVersion} (restart did not take)` }
+  }
 
   const key = readEnvVal('OPENAI_API_KEY')
-  if (key && existsSync(GBRAIN_BIN) && existsSync(join(GBRAIN_DIR, 'config.json'))) {
+  if (key && brainExpected) {
+    // Key present AND recall expected: the engine + config MUST be there after the update.
+    // A missing one is the silent-empty-brain outcome v1.1 set out to kill — FAIL, don't
+    // skip (the old gate skipped when config.json was absent, passing a dead brain).
+    if (!existsSync(GBRAIN_BIN) || !existsSync(join(GBRAIN_DIR, 'config.json'))) {
+      return { ok: false, why: 'recall expected (OpenAI key present) but gbrain engine/config is missing after update' }
+    }
     const q = spawnSync(GBRAIN_BIN, ['query', 'healthcheck', '--limit', '1'], {
       env: { ...process.env, HOME: homedir(), OPENAI_API_KEY: key }, encoding: 'utf-8', timeout: 20000,
     })
@@ -238,7 +286,7 @@ async function notify(curVer, newVer) {
 }
 
 // ---- APPLY mode (opt-in: enableAutoUpdate === 'auto') ----
-async function apply(remoteSha, oldVer) {
+async function apply(remoteSha, oldVer, newVer) {
   // Loop-breaker: never re-apply the same origin/main commit that already failed here.
   // Without this a genuinely-broken push would stop->reset->fail->rollback every week.
   try {
@@ -248,6 +296,8 @@ async function apply(remoteSha, oldVer) {
       return
     }
   } catch {}
+
+  const brainExpected = readBundle().enableRecall !== false
 
   // Stop the daemon FIRST so it isn't writing ~/.gbrain while we snapshot it, then take a
   // quiescent snapshot. The whole mutate region is guarded: if salvage/reset/build/migrate
@@ -259,18 +309,25 @@ async function apply(remoteSha, oldVer) {
   try {
     salvaged = salvageAndReset()
     b = build()
-    if (b.ok) { const boot = run('node ./template/bootstrap.js'); if (!boot.ok) b = { ok: false, out: boot.out } }
+    // --migrate-only: run JUST migrations + render + brain rebuild + version stamp, NOT the
+    // full install. The full bootstrap re-runs installClaudePlugins/installUv/RTK, any of
+    // which process.exit(1) on a transient third-party registry hiccup — that would roll
+    // back a perfectly good code update every week for a reason that has nothing to do with us.
+    if (b.ok) { const boot = run('node ./template/bootstrap.js --migrate-only'); if (!boot.ok) b = { ok: false, out: boot.out } }
   } catch (e) {
     b = { ok: false, out: `update threw: ${e.message?.split('\n')[0] || e}` }
   } finally {
     daemon('start')
   }
 
-  const gate = b.ok ? await verifyGate(true) : { ok: false, why: (b.out || 'build/migrate failed').split('\n')[0].slice(0, 200) }
+  const gate = b.ok ? await verifyGate(true, newVer, brainExpected) : { ok: false, why: (b.out || 'build/migrate failed').split('\n')[0].slice(0, 200) }
   if (!gate.ok) {
     const restoredOk = rollback(snap)
     daemon('start')
-    try { mkdirSync(ROLLBACK_ROOT, { recursive: true }); writeFileSync(LAST_FAILED, remoteSha) } catch {}
+    // Only blacklist the commit when the failure is REAL (build/migrate/brain broke), not
+    // when the box was merely slow to answer health (gate.transient) — otherwise one slow
+    // start permanently downgrades a good release to notify-only.
+    if (!gate.transient) { try { mkdirSync(ROLLBACK_ROOT, { recursive: true }); writeFileSync(LAST_FAILED, remoteSha) } catch {} }
     const tail = restoredOk
       ? `You're still on your previous working version (v${oldVer || '?'}); nothing was lost.`
       : `WARNING: the rollback rebuild also failed - please run /update by hand to recover.`
@@ -289,12 +346,22 @@ async function apply(remoteSha, oldVer) {
 async function main() {
   preflight()
 
-  // Interactive skill's frozen-pull recovery: just the safe git unstick.
+  // Interactive skill's frozen-pull recovery: just the safe git unstick. This runs the
+  // SAME snapshot + reset as the apply path, so it needs the SAME guards: take the lock
+  // (so the weekly timer can't run a reset/snapshot at the same moment) and stop the
+  // daemon (so it isn't writing ~/.gbrain while we snapshot it). Leave the daemon stopped —
+  // the /update skill rebuilds and restarts it; restarting stale dist here would be pointless.
   if (SALVAGE_ONLY) {
-    tryGit('fetch origin main')
-    snapshot()
-    const n = salvageAndReset()
-    log(`product files reset to origin/main${n ? `; ${n} local edit(s) salvaged to client-overlay/quarantine` : ''}. Continue the update (build + bootstrap).`)
+    acquireLock()
+    try {
+      tryGit('fetch origin main')
+      daemon('stop')
+      snapshot()
+      const n = salvageAndReset()
+      log(`product files reset to origin/main${n ? `; ${n} local edit(s) salvaged to client-overlay/quarantine` : ''}. Daemon stopped — finish the update (build + bootstrap) then restart it.`)
+    } finally {
+      releaseLock()
+    }
     return
   }
 
@@ -309,7 +376,7 @@ async function main() {
     const newVer = verOf('origin/main')
     const wantApply = FORCE_APPLY || readBundle().enableAutoUpdate === 'auto'
 
-    if (wantApply) await apply(remote, oldVer)
+    if (wantApply) await apply(remote, oldVer, newVer)
     else await notify(oldVer, newVer)
   } finally {
     releaseLock()

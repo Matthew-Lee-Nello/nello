@@ -1,7 +1,17 @@
 import { Router } from 'express'
-import { getDb } from '@nello/core'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { getDb, PROJECT_ROOT } from '@nello/core'
 
 const started = Date.now()
+
+// The VERSION this daemon BOOTED from, read once at process start. The self-update verify
+// gate compares it to the version it just reset to: if a stale old-code daemon is still
+// answering (restart didn't take), it reports the OLD version it loaded at its own start,
+// and the gate fails instead of passing a daemon running the previous build.
+const BUILD_VERSION = (() => {
+  try { return readFileSync(join(PROJECT_ROOT, 'VERSION'), 'utf-8').trim() } catch { return undefined }
+})()
 
 export function monitoringRouter(): Router {
   const r = Router()
@@ -10,6 +20,7 @@ export function monitoringRouter(): Router {
     const mem = process.memoryUsage()
     res.json({
       status: 'ok',
+      version: BUILD_VERSION,
       uptime_s: Math.floor((Date.now() - started) / 1000),
       uptime: Math.floor((Date.now() - started) / 1000),
       memoryUsage: {

@@ -6,6 +6,46 @@ file and stamped into `.nello-version` on every install/update. When you run `/u
 the assistant reads the section(s) between your old version and the new one and tells
 you what changed.
 
+## [1.2.0] - 2026-06
+
+Reliability release. v1.1 stopped the email check from quietly running up an OpenAI bill;
+this fixes it at the source, makes updates safe enough to leave on their own, and hardens
+the parts that could lose your memory on a bad update.
+
+### Added
+- **Auto-fetch is now cheap and self-limiting.** Filing your email into memory runs on a
+  small, fast model with a hard ceiling, only looks at what's actually new since last time,
+  and a single code step decides what's already been seen - so the same email can never be
+  re-filed and re-charged in a loop. A check that keeps failing now counts as a failure and
+  pauses itself instead of running forever.
+- **`nello autofetch off` stays off.** Turning the email check off now sticks across updates
+  and restarts, even if other settings were reset. Turning it back on clears the slate so it
+  won't immediately re-pause.
+- **Safer auto-updates.** If you switch on hands-off updates (`enableAutoUpdate: "auto"`),
+  an update now only touches the parts it needs to, waits longer for a slow machine before
+  deciding anything is wrong, checks the new version is actually the one running, and won't
+  give up on a good update just because your machine was slow to start once.
+- **`nello doctor --deep` runs a real memory check.** It now actually queries your memory,
+  so it catches a brain that looks fine on paper but answers with mismatched results.
+
+### Changed
+- **Your memory can't be silently wiped by an update any more.** If an update is interrupted
+  at the wrong moment, or a rollback restores an older memory, the next update detects it and
+  rebuilds your memory on the right model instead of leaving it broken and "done".
+- **Updates can't get stuck and can't be hijacked.** The self-repair step now stops the
+  background app and takes a lock while it works (so two updates can't collide), salvages your
+  edits even when filenames have spaces, and refuses to update from anything but the official
+  Nello repo.
+
+### Caveats
+- **The brain runs on OpenAI.** Memory and the email check use your `OPENAI_API_KEY`. Without
+  it, memory stays off and everything else still works. The email check uses a small amount of
+  OpenAI credit; run `nello autofetch off` any time to stop it.
+- **Hands-off updates stay opt-in.** The weekly check still only tells you an update is ready
+  and waits for you to run `/update`, unless you set `enableAutoUpdate` to `"auto"`.
+
+[1.2.0]: https://github.com/Matthew-Lee-Nello/nello/releases/tag/v1.2.0
+
 ## [1.1.0] - 2026-06
 
 Reliability release. Fixes the brain carry-forward so an older install actually moves

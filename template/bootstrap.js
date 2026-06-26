@@ -15,7 +15,7 @@
  *   7. Run audit at the end
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, copyFileSync, readdirSync, chmodSync, renameSync, realpathSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, symlinkSync, unlinkSync, lstatSync, copyFileSync, readdirSync, chmodSync, renameSync, realpathSync, rmSync } from 'node:fs'
 import { join, dirname, basename, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { homedir } from 'node:os'
@@ -331,6 +331,9 @@ function writeVersionStamp(installPath, appliedMigrations) {
     date: prev.date ?? null,
     stampedAt: new Date().toISOString(),
     appliedMigrations: appliedMigrations ?? prev.appliedMigrations ?? [],
+    // Preserve the last version we Telegrammed an announcement for, so --announce can
+    // dedupe a repeat call and not double-send. Must survive a restamp like appliedMigrations.
+    announcedVersion: prev.announcedVersion ?? null,
   }
   try {
     const opts = { cwd: TEMPLATE_DIR, stdio: ['ignore', 'pipe', 'ignore'] }
@@ -339,6 +342,19 @@ function writeVersionStamp(installPath, appliedMigrations) {
   } catch {}
   try {
     writeFileSync(join(installPath, '.nello-version'), JSON.stringify(stamp, null, 2) + '\n')
+  } catch {}
+}
+
+// Cap how many `<base>.bak-<ts>` rollback backups pile up in a dir. /update and the
+// skill-collision handling write a timestamped backup every run; without a cap a long-
+// lived install accumulates them forever. Keep the newest `keep`, delete the rest. The
+// fixed-width ms timestamp sorts lexically == chronologically. Best-effort, never fatal.
+function pruneBackups(dir, base, keep = 5) {
+  try {
+    const baks = readdirSync(dir).filter(f => f.startsWith(`${base}.bak-`)).sort()
+    for (const f of baks.slice(0, Math.max(0, baks.length - keep))) {
+      try { unlinkSync(join(dir, f)) } catch {}
+    }
   } catch {}
 }
 
@@ -468,11 +484,25 @@ async function sendTelegramMessage(env, text) {
   } catch { return false }
 }
 
+function markAnnounced(installPath, version) {
+  try {
+    const stamp = readVersionStamp(installPath)
+    stamp.announcedVersion = version
+    writeFileSync(join(installPath, '.nello-version'), JSON.stringify(stamp, null, 2) + '\n')
+  } catch {}
+}
+
 async function runAnnounce(ctx) {
-  const newVersion = readVersionStamp(INSTALL_PATH).version || ''
+  const stamp = readVersionStamp(INSTALL_PATH)
+  const newVersion = stamp.version || ''
   const oldVersion = readPrevBackupVersion(INSTALL_PATH)
-  // Already announced this version? The skill may call --announce more than once; only
-  // re-send if the version actually moved (or we have no record).
+  // Already announced this version? The skill (and the auto-apply path) may call --announce
+  // more than once for the same update; only send when the version actually moved, so the
+  // owner never gets a duplicate "Nello just updated" Telegram.
+  if (newVersion && stamp.announcedVersion === newVersion) {
+    console.log(`${DIM}(already announced v${newVersion} - not re-sending)${RESET}`)
+    return
+  }
   const { changed, caveats } = readChangelogRange(oldVersion, newVersion)
   const missing = missingRequiredKeys(ctx)
   const brainMissing = missing.find(m => m.key === 'OPENAI_API_KEY')
@@ -482,6 +512,9 @@ async function runAnnounce(ctx) {
   const sent = await sendTelegramMessage(ctx.env, msg)
   console.log('\n' + msg + '\n')
   console.log(sent ? `${ACCENT}(sent to Telegram)${RESET}` : `${DIM}(Telegram not configured - message shown above only)${RESET}`)
+  // Record it so a repeat --announce for the same version doesn't double-send. Only mark
+  // when we actually have a version (an unversioned ancient install just re-announces).
+  if (newVersion) markAnnounced(INSTALL_PATH, newVersion)
 }
 
 // Patch bundle.json in place, applying only a structural mutation (e.g. flip an
@@ -1028,6 +1061,24 @@ function configureGbrain(openaiKey) {
   const cfgDir = join(homedir(), '.gbrain')
   const cfgPath = join(cfgDir, 'config.json')
   const env = { ...process.env, HOME: homedir(), OPENAI_API_KEY: openaiKey || '' }
+
+  // Self-heal a dimension/model mismatch, every bootstrap — not just via the one-shot
+  // migration. If the existing store is on Voyage or a non-1536 dimension and we have a
+  // key to rebuild with, wipe it BEFORE writing the 1536 config so seedRecall re-embeds
+  // fresh. Without this, patching the config to 1536 over a 1024-dim store leaves config
+  // and vectors disagreeing → every query mismatches. This is the durable fix for a
+  // rollback that restored an old-dimension brain while .nello-version still marked the
+  // migration applied (so 0002 would be skipped): configureGbrain heals it regardless.
+  // Guarded on `openaiKey` so we NEVER wipe a brain we can't rebuild (a keyless install
+  // keeps its working Voyage store untouched).
+  if (openaiKey && existsSync(cfgPath)) {
+    try {
+      const cur = JSON.parse(readFileSync(cfgPath, 'utf-8'))
+      const stale = String(cur.embedding_model || '').startsWith('voyage') || Number(cur.embedding_dimensions) !== 1536
+      if (stale) { rmSync(cfgDir, { recursive: true, force: true }); info('Brain was on an old embedding model/dimension — clearing it to rebuild on OpenAI (1536).') }
+    } catch { rmSync(cfgDir, { recursive: true, force: true }) } // unreadable config = treat as stale, rebuild clean
+  }
+
   try {
     if (!existsSync(cfgPath)) execSync(`"${GBRAIN_BIN}" init --pglite`, { stdio: 'pipe', env })
   } catch { /* init is best-effort; the patch below still writes a usable config */ }
@@ -1334,6 +1385,12 @@ async function main() {
   // Read-only: compose + send the post-update "what changed / one thing to do" Telegram
   // message and exit. No migrations, no provisioning, no writes.
   const ANNOUNCE = process.argv.includes('--announce')
+  // Reduced apply path for the unattended self-update. Runs migrations + render + brain
+  // rebuild + skill relink + version stamp, but SKIPS the network/third-party install
+  // steps (installClaudePlugins, obsidian, uv, rtk, shortcuts) — any of which can
+  // process.exit(1) on a transient registry hiccup and would otherwise roll back a good
+  // code update. An established install already has all of those; a migrate doesn't touch them.
+  const MIGRATE_ONLY = process.argv.includes('--migrate-only')
 
   if (!CONFIGS_ONLY && !REPORT_MISSING && !ANNOUNCE) detectStaleInstalls()
 
@@ -1404,6 +1461,13 @@ async function main() {
   // appliedMigrations is preserved.
   writeVersionStamp(INSTALL_PATH, appliedMigrations)
 
+  // Cap the rollback backups /update leaves so they don't grow unbounded on a long-lived
+  // install (keep the newest 5 of each). Skip on the read-only --configs-only fast path.
+  if (!CONFIGS_ONLY) {
+    for (const base of ['.env', 'bundle.json', '.mcp.json', '.nello-version']) pruneBackups(INSTALL_PATH, base)
+    try { pruneBackups(dirname(SETTINGS_PATH), basename(SETTINGS_PATH)) } catch {}
+  }
+
   // --configs-only: the `sync-env-to-configs.sh` fast path. Regenerate JUST
   // .mcp.json + claude_desktop_config.json from the live .env (already overlaid
   // onto bundle.keys above), then stop — no persona re-render, no vault reseed,
@@ -1468,8 +1532,10 @@ async function main() {
   })
   ok(`vault seeded (${seedResult.written.length} files, ${seedResult.skipped.length} skipped)`)
 
-  info('Installing Claude Code plugins (agentmemory, karpathy-skills)')
-  installClaudePlugins()
+  if (!MIGRATE_ONLY) {
+    info('Installing Claude Code plugins (agentmemory, karpathy-skills)')
+    installClaudePlugins()
+  }
 
   info('Linking skill pack + merging settings.json')
   symlinkSkills()
@@ -1484,6 +1550,7 @@ async function main() {
   mkdirSync(join(ctx.vaultPath, 'Journal'), { recursive: true })
   ok('store/, workspace/uploads/, vault/Memory/, vault/Journal/')
 
+  if (!MIGRATE_ONLY) {
   info('Setting up Obsidian (vault is the permanent memory)')
   installObsidianApp()
   try {
@@ -1504,13 +1571,15 @@ async function main() {
 
   info('Installing uv (Python runtime for Google Workspace MCP)')
   installUv()
+  } // end !MIGRATE_ONLY (plugins/obsidian/uv)
 
-  // Semantic recall: installs Bun + gbrain + graphify and embeds the seeded vault
-  // via OpenAI. No-op unless an OPENAI_API_KEY is present (ctx.brainEnabled).
+  // Semantic recall: configures gbrain + re-embeds the vault on the OpenAI model. This
+  // MUST run on a migrate (it's the brain carry-forward); its installs are no-ops on an
+  // already-set-up box. No-op unless an OPENAI_API_KEY is present (ctx.brainEnabled).
   setupRecall(ctx)
 
-  // RTK token saver (every install; best-effort + non-fatal).
-  installRtk()
+  // RTK token saver (every full install; best-effort + non-fatal). Skip on a migrate.
+  if (!MIGRATE_ONLY) installRtk()
 
   if (bundle.installLaunchAgent) {
     info('Installing auto-start service')
@@ -1550,6 +1619,12 @@ async function main() {
       env: { ...process.env, NC_INSTALL_PATH: INSTALL_PATH },
     })
   } catch {}
+
+  // Migrate-only (self-update apply path): version is already stamped, migrations ran,
+  // configs + skills + brain + tasks are refreshed. Stop here — the app shortcut, the
+  // "delete your bundle / log in to Claude" owner epilogue, and the 30s dashboard poll are
+  // for an interactive install, not an unattended apply (self-update runs its own gate).
+  if (MIGRATE_ONLY) { ok('migrate-only bootstrap complete'); return }
 
   // App shortcut. Universal here so all entry paths get it (bash one-liner,
   // PowerShell, Claude Code paste-in, manual git clone).

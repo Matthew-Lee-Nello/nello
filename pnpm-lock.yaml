@@ -50,6 +50,9 @@ importers:
       '@nello/core':
         specifier: workspace:*
         version: link:../core
+      '@nello/vault-seeder':
+        specifier: workspace:*
+        version: link:../vault-seeder
     devDependencies:
       '@types/node':
         specifier: ^20.12.7

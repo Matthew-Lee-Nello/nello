@@ -23,7 +23,7 @@ Already installed and want the latest? Go to `labs.nello.gg/update` and paste th
 
 ## Seed your company brain
 
-After install, `/build-brain` imports your exported ChatGPT history and backfills your connected tools (Gmail, Calendar, Drive, Notion, CRM) into the Obsidian vault - archived + extracted into the taxonomy with wikilinks.
+Optional, and you run it when you're ready: `/build-brain` backfills your connected tools (Gmail, Calendar, Drive, Notion, CRM) into the Obsidian vault, archived and extracted into the taxonomy with wikilinks. Point it at an exported ChatGPT history (`/build-brain export <path>`) to fold that in too, or run `/build-brain aggregate` for just the connected tools. It uses OpenAI credit to embed, so it's a deliberate step, not an automatic one.
 
 ## Licence
 

@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
-import { execSync } from 'node:child_process'
+import { execSync, spawnSync } from 'node:child_process'
 import { homedir } from 'node:os'
-import { PROJECT_ROOT, STORE_DIR, VAULT_PATH, listTasks, setTaskStatus, type Task } from '@nello/core'
+import { PROJECT_ROOT, STORE_DIR, VAULT_PATH, listTasks, setTaskStatus, resetTaskFailures, setMeta, deleteMeta, type Task } from '@nello/core'
 
 export interface Check {
   name: string
@@ -164,6 +164,26 @@ function deepChecks(): Check[] {
     out.push({ name: 'brain: memory engine', ok: engineOn || !openaiKey, detail: engineOn ? 'gbrain' : (openaiKey ? 'legacy/FTS - key present but engine not flipped; re-run /update' : 'legacy/FTS - no key yet') })
   }
 
+  // Brain LIVENESS, not just config. The config check above trusts ~/.gbrain/config.json,
+  // but a config that says openai/1536 over a store still holding 1024-dim vectors (a
+  // half-finished 0002, or a rollback that restored an old store) passes the config check
+  // while every real query mismatches. A live query is the only thing that surfaces it.
+  if (brainExpected && openaiKey && existsSync(gbrainBin)) {
+    const q = spawnSync(gbrainBin, ['query', 'nello-doctor-healthcheck', '--limit', '1'], {
+      env: { ...process.env, HOME: homedir(), OPENAI_API_KEY: openaiKey }, encoding: 'utf-8', timeout: 20000,
+    })
+    const qout = (q.stdout || '') + (q.stderr || '')
+    if (q.error) {
+      out.push({ name: 'brain: live query', ok: false, detail: `gbrain query could not run (${q.error.message?.split('\n')[0] || 'spawn error'})` })
+    } else if (/dimension mismatch|vector dimension|expected \d+ dimensions/i.test(qout)) {
+      out.push({ name: 'brain: live query', ok: false, detail: 'store dimension mismatch - config says 1536 but the vectors disagree; run /build-recall to rebuild' })
+    } else if (/unauthor|invalid api key|incorrect api key|\b401\b/i.test(qout)) {
+      out.push({ name: 'brain: live query', ok: false, detail: 'OpenAI key rejected at query time - check OPENAI_API_KEY' })
+    } else {
+      out.push({ name: 'brain: live query', ok: true, detail: 'responds (no auth/dimension error)' })
+    }
+  }
+
   // Scheduled tasks: list every cron and flag the email-scrape cost path + duplicates.
   let tasks: Task[] = []
   try { tasks = listTasks() } catch { /* db not created yet */ }
@@ -235,12 +255,19 @@ export function runAutofetch(action: string): void {
   if (action === 'off') {
     for (const t of tasks) setTaskStatus(t.id, 'paused')
     patchBundleFlag('enableAutoFetch', false)
+    // Durable opt-out tombstone in the DB. Survives a deleted bundle.json AND a deleted
+    // task row, so /update's auto-fetch re-seed won't resurrect a job the owner turned off.
+    try { setMeta('autofetch_optout', '1') } catch { /* no db yet — bundle flag still covers it */ }
     console.log(`auto-fetch paused (${tasks.length} task${tasks.length === 1 ? '' : 's'}). It won't read your email or spend OpenAI credit until you run \`nello autofetch on\`.`)
     return
   }
   if (action === 'on') {
-    for (const t of tasks) setTaskStatus(t.id, 'active')
+    // Reset the breaker counter on resume. Without this, a task that was paused while
+    // carrying stale consecutive_failures would re-trip on its first tick back and
+    // re-pause itself with a confusing "paused after 5 failures" the owner never caused.
+    for (const t of tasks) { setTaskStatus(t.id, 'active'); resetTaskFailures(t.id) }
     patchBundleFlag('enableAutoFetch', true)
+    try { deleteMeta('autofetch_optout') } catch { /* no db yet */ }
     console.log(tasks.length ? `auto-fetch resumed (${tasks.length} task${tasks.length === 1 ? '' : 's'}).` : 'auto-fetch will be seeded on the next /update or daemon start.')
     return
   }

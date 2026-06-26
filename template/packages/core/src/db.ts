@@ -115,6 +115,11 @@ export function initDatabase(db: Database.Database = getDb()): void {
       FOREIGN KEY (chat_id) REFERENCES dashboard_chats(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_messages_chat ON dashboard_messages(chat_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 
   // Idempotent column add for the scheduled_tasks lease. better-sqlite3 throws
@@ -373,4 +378,23 @@ export function bumpTaskFailure(id: string): number {
 
 export function resetTaskFailures(id: string): void {
   getDb().prepare('UPDATE scheduled_tasks SET consecutive_failures = 0 WHERE id = ?').run(id)
+}
+
+// ---------- meta kv ----------
+// Small durable key/value store for install-level flags that must outlive a deleted
+// bundle.json or a deleted task row. Used for the auto-fetch opt-out tombstone so
+// `nello autofetch off` stays off across /update even if the task was removed.
+export function getMeta(key: string): string | null {
+  const row = getDb().prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined
+  return row?.value ?? null
+}
+
+export function setMeta(key: string, value: string): void {
+  getDb()
+    .prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(key, value)
+}
+
+export function deleteMeta(key: string): void {
+  getDb().prepare('DELETE FROM meta WHERE key = ?').run(key)
 }

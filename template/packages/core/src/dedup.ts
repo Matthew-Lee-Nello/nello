@@ -86,6 +86,20 @@ export function classify(source: string, source_id: string, content: string): {
 }
 
 /**
+ * Most recent `written_at` (epoch ms) the dedup index has recorded for a source,
+ * or null if the source has never been seen. This is the auto-fetch cursor: the
+ * scheduler/agent fetches only items newer than this, so an empty tick stays cheap
+ * instead of re-listing (and the agent re-classifying) the same window every time.
+ */
+export function lastSeenAt(source: string): number | null {
+  ensureTable()
+  const row = getDb()
+    .prepare('SELECT MAX(written_at) AS m FROM auto_fetch_seen WHERE source = ?')
+    .get(source) as { m: number | null } | undefined
+  return row?.m ?? null
+}
+
+/**
  * Record (or upsert) a write. Call after the auto-fetch pipeline actually
  * lands the note in the vault.
  */

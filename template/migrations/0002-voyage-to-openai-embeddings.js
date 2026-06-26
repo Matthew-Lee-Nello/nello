@@ -31,13 +31,17 @@ export default {
   // config points at OpenAI but whose vectors are still 1024). A fresh install (no
   // store) returns false: configureGbrain builds it at 1536 from the start, nothing to do.
   detect() {
+    // A missing config is a fresh install (configureGbrain builds it at 1536) — nothing
+    // to migrate. But an UNREADABLE/corrupt config must fail CLOSED: returning false there
+    // would record the migration "done" and a genuinely stale 1024-dim store would never
+    // be re-embedded (recall silently mismatches forever). Treat corrupt as "needs migration".
+    if (!existsSync(GBRAIN_CFG)) return false
     try {
-      if (!existsSync(GBRAIN_CFG)) return false
       const cfg = JSON.parse(readFileSync(GBRAIN_CFG, 'utf-8'))
       const model = typeof cfg.embedding_model === 'string' ? cfg.embedding_model : ''
       const dims = Number(cfg.embedding_dimensions)
       return model.startsWith('voyage') || dims !== TARGET_DIM
-    } catch { return false }
+    } catch { return true }
   },
 
   run(ctx) {

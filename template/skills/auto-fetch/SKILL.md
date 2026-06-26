@@ -1,103 +1,86 @@
 ---
 name: auto-fetch
-description: Walk every active MCP connection (Gmail, Calendar, Drive, Slack if connected) and fold new items into the vault with provenance + dedup. Use when triggered by the scheduled auto-fetch task every 20 minutes, or when user says "run auto-fetch", "fetch now", "pull new emails", "/auto-fetch". Reads each connection's per-source cursor, fetches new items since last tick, classifies via @nello/core dedup (skip unchanged, write new, overwrite updated), writes notes with @nello/vault-seeder provenance frontmatter into vault/Inbox/auto-fetch/<source>/<source_id>.md, and appends a one-line entry per item to vault/Inbox.md. Posts a one-line summary on completion.
+description: Walk every active MCP connection (Gmail, Calendar, Drive, Slack if connected), fetch only what's new since the last tick, triage each item, and hand the batch to `nello autofetch-write` which deduplicates, writes notes with provenance, and records them seen — in code, atomically. Use when triggered by the scheduled auto-fetch task every 20 minutes, or when the user says "run auto-fetch", "fetch now", "pull new emails", "/auto-fetch". Posts a one-line summary on completion.
 model_hint: fast
 ---
 
 # Auto-fetch
 
-One global tick across every active connection. Runs on a 20-minute cron by default. Pulls only what changed since the last tick, dedupes by content, writes with provenance.
+One global tick across every active connection. Runs on a 20-minute cron by default. Pulls only what changed since the last tick.
 
-## Why this exists
-
-The user shouldn't have to ask "what's new in my inbox?" - the system should already have read it, classified it, and dropped the highlights into the vault by the time they open it. This skill is the worker that walks the connections.
+**You fetch and triage. Code does the rest.** Dedup classification, writing notes with provenance, the Inbox.md append, and recording items as seen are all done deterministically by `nello autofetch-write` — you never call `classify`/`markSeen` or write auto-fetch notes by hand. This is deliberate: a missed `markSeen` used to re-scrape and re-embed the same email every tick and run up the OpenAI bill. The gate is in code now so that can't happen.
 
 ## When this fires
 
-- Every 20 minutes (default) via the scheduled task registered at install. The task ID is whatever `nc-schedule list` returns for the prompt that starts with "Run /auto-fetch".
-- On demand when the user says **"run auto-fetch"**, **"fetch now"**, **"pull new emails"**, **"/auto-fetch"**.
-- The morning brief task may call this as its first step.
+- Every 20 minutes (default) via the scheduled task. The task is whatever `nello autofetch status` reports.
+- On demand: **"run auto-fetch"**, **"fetch now"**, **"pull new emails"**, **"/auto-fetch"**.
+- The morning brief may call this as its first step.
 
-## The contract per tick
+## The tick
 
-For each enabled MCP connection (decided at runtime — only fetch from what's actually wired):
+### 1. Per source, get the cursor and fetch only what's new
 
-### 1. Determine the cursor
+For each enabled MCP connection (only the ones actually wired):
 
-Read the last `fetched_at` for this source from the dedup index (`@nello/core` `getSeen` — most recent for source). If none, default to "last 24 hours" for first run, otherwise "since last cursor".
+```bash
+nello autofetch-cursor <source>   # prints an ISO timestamp, or nothing on first run
+```
 
-### 2. Fetch new items
+Fetch items newer than that cursor (on first run, default to the last 24 hours):
 
 | Source | MCP tool | Query |
 |---|---|---|
 | `gmail` | `mcp__google_workspace__search_gmail_messages` | `after:<cursor>` |
 | `calendar` | `mcp__google_workspace__list_events` | `timeMin=<cursor>` |
-| `drive` | `mcp__google_workspace__list_drive_items` | filter by `modifiedTime>=<cursor>` |
+| `drive` | `mcp__google_workspace__list_drive_items` | `modifiedTime>=<cursor>` |
 | `slack` (if connected) | the connected slack MCP | `oldest=<cursor>` |
 
-Cap each source at 50 items per tick. If a source has more, stop at 50 and log "Truncated at 50 items, will catch up next tick."
+**Cap each source at 50 items per tick.** If there are more, take the 50 oldest and note "will catch up next tick" — the next tick's cursor picks up where you stopped.
 
-### 3. Dedup-classify each item
+If a connection is down, skip that source and continue. One broken connector never kills the tick.
 
-For each item, build a stable `source_id` and a `content` string (the body the agent will store), then:
+### 2. Triage each item (cheap, fast)
 
-```js
-import { classify, markSeen } from '@nello/core'
-const { verdict, hash, previous } = classify(source, source_id, content)
+For every fetched item decide one verdict:
+
+- `drop` — noise; record it seen so it never comes back, but write nothing.
+- `ack` — worth keeping, not worth surfacing; write the note, no Inbox.md line.
+- `react` — the default; write the note and add an Inbox.md line.
+- `escalate` — time-sensitive; write + Inbox.md line + you'll Telegram a one-liner (step 4).
+
+### 3. Hand the whole batch to the code gate
+
+Assemble **one** JSON array across all sources. Each element:
+
+```json
+{
+  "source": "gmail",
+  "source_id": "<stable upstream id: gmail thread_id, calendar event_id, slack ts>",
+  "toolkit": "google_workspace",
+  "scope": "thread",
+  "summary": "<one-line summary for the Inbox.md entry>",
+  "fields": { "sender": "...", "subject": "...", "date": "..." },
+  "body": "<the note body you want stored>",
+  "triage": "react"
+}
 ```
 
-- `verdict === 'unchanged'` → skip, do not write, do not count.
-- `verdict === 'new'` → run triage (step 3b), then act on the triage verdict (step 4).
-- `verdict === 'updated'` → run triage (step 3b), then act on the triage verdict; if writing, overwrite at `previous.vault_path`.
+Write it to a temp file and call the gate:
 
-### 3b. Triage each new/updated item
-
-Invoke `/triage` on the item (cheap fast-model classifier). It returns one of `drop | ack | react | escalate`:
-
-- `drop` → call `markSeen({ source, source_id, content_hash: hash, vault_path: null })` but write nothing. Increment the "dropped" counter, move on.
-- `ack` → write the note (step 4) but skip the `Inbox.md` append (step 5). User can find it via search if they need it.
-- `react` → write the note + append the `Inbox.md` line. This is the default.
-- `escalate` → write the note + append `Inbox.md` line + send a one-line Telegram message via the bot (use the existing send-message MCP if available, or write a flagged entry to `Inbox.md` prefixed `**ESCALATE** —` so the user notices on next open).
-
-Pass the triage verdict back to the user's final summary line so they can see the distribution.
-
-### 4. Write the note
-
-```js
-import { noteWithProvenance } from '@nello/vault-seeder'
-const body = noteWithProvenance({
-  source, source_id, toolkit, scope, time_range, fetched_at, content_hash: hash,
-  // extras as needed: sender, subject, channel, etc.
-}, content)
+```bash
+nello autofetch-write /tmp/autofetch-batch.json
 ```
 
-Path: `vault/Inbox/auto-fetch/<source>/<source_id>.md`. Create directories as needed.
+It classifies each item against the dedup index (skips `unchanged` — no write, no embed), writes new/updated notes to `vault/Inbox/auto-fetch/<source>/<source_id>.md` with provenance frontmatter, appends the Inbox.md lines, never clobbers a note a human edited after the last write, and records every item seen — all atomically. It prints a one-line summary, then a line beginning `NELLO_AUTOFETCH_RESULT ` followed by JSON `{ "summary": ..., "escalations": [...] }`. Read the summary for the chat reply; parse the JSON after that marker for the escalations.
 
-### 5. Append to Inbox.md
+### 4. Report
 
-For each new/updated item, append a single line to `vault/Inbox.md`:
-
-```
-- [HH:MM] <source>: <one-line summary> → [[Inbox/auto-fetch/<source>/<source_id>]]
-```
-
-Order matters: oldest item first within a tick. Don't rewrite existing lines.
-
-## Output
-
-When the whole tick completes, reply with exactly one line to the chat:
-
-```
-Auto-fetch: <N> new, <M> updated, <S> skipped (dropped <D>, acked <A>, reacted <R>, escalated <E>) across <K> sources.
-```
-
-No preamble. No multi-line summary. The vault is the artefact — the chat just confirms.
+- Send the printed `summary` line to the chat as your only reply. No preamble, no multi-line recap.
+- For each entry in `escalations`, send a single Telegram line via the bot (the connected send-message tool) so the user sees the urgent ones immediately.
 
 ## Rules
 
-- **Never fetch more than 50 items per source per tick.** Truncation is fine — next tick will catch up.
-- **Never overwrite a vault note the user has hand-edited.** If the dedup index says we wrote it but the file's mtime is later than the recorded `written_at`, treat as user-modified, log a warning, skip.
-- **Never write into `vault/Memory/`, `vault/Journal/`, or root-level non-Inbox files.** Auto-fetch owns `vault/Inbox/auto-fetch/<source>/` and the per-line Inbox.md append. Nothing else.
-- **Never write into `vault/notes/` either** — that's reserved for user-typed hand notes that other systems may auto-ingest.
-- **Fail gracefully.** If an MCP is down, log it, skip the source, continue with the rest. Never let one broken connector kill the whole tick.
-- **Don't spam the chat.** One line per tick, period.
+- **Never write auto-fetch notes yourself.** Build the JSON batch and let `nello autofetch-write` do every write. It owns `vault/Inbox/auto-fetch/<source>/` and the Inbox.md append, and nothing else.
+- **Never call `classify`/`markSeen` by hand** — the gate does, transactionally.
+- **Never fetch more than 50 items per source per tick.**
+- **Don't spam the chat.** One line per tick.

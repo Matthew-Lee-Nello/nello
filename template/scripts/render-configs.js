@@ -25,91 +25,40 @@ export function composioMcpUrl(env) {
   return env.COMPOSIO_MCP_URL || ''
 }
 
-export function renderMcpJson(ctx) {
+// ONE provider table both surfaces render from, so Claude Code's .mcp.json and the
+// Claude Desktop config can't drift apart (they used to: .mcp.json shipped apify but not
+// tavily/firecrawl; the desktop config shipped tavily/firecrawl but not apify). Each
+// entry: the mcps flag that enables it, an optional extra `gate`, and the server factory.
+const MCP_PROVIDERS = [
+  // composio: only emit once provisioned. A blank url (provision skipped, or a
+  // --configs-only re-render before the URL was minted) yields an http server that
+  // silently fails to connect, so the agent believes Gmail is wired when it isn't.
+  { key: 'composio', gate: (env) => !!composioMcpUrl(env), server: (ctx, env) => ({ type: 'http', url: composioMcpUrl(env), headers: { 'x-api-key': env.COMPOSIO_API_KEY || '' } }) },
+  { key: 'obsidian', server: (ctx) => ({ command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', ctx.vaultPath] }) },
+  { key: 'tavily', server: (ctx, env) => ({ command: 'npx', args: ['-y', 'tavily-mcp'], env: { TAVILY_API_KEY: env.TAVILY_API_KEY || '' } }) },
+  { key: 'exa', server: (ctx, env) => ({ command: 'npx', args: ['-y', 'exa-mcp-server'], env: { EXA_API_KEY: env.EXA_API_KEY || '' } }) },
+  { key: 'firecrawl', server: (ctx, env) => ({ command: 'npx', args: ['-y', 'firecrawl-mcp'], env: { FIRECRAWL_API_KEY: env.FIRECRAWL_API_KEY || '' } }) },
+  { key: 'apify', server: (ctx, env) => ({ command: 'npx', args: ['-y', '@apify/actors-mcp-server'], env: { APIFY_TOKEN: env.APIFY_TOKEN || '' } }) },
+]
+
+function renderMcpServers(ctx) {
   const mcps = ctx.mcps || {}
   const env = ctx.env || {}
   const servers = {}
+  for (const p of MCP_PROVIDERS) {
+    if (!mcps[p.key]) continue
+    if (p.gate && !p.gate(env)) continue
+    servers[p.key] = p.server(ctx, env)
+  }
+  return servers
+}
 
-  // Only emit composio once it's actually provisioned. A blank url (provision
-  // skipped, or a --configs-only re-render before the URL was minted) yields an
-  // http server that silently fails to connect - so the agent believes Gmail is
-  // wired when it isn't. Gate on the URL being present.
-  if (mcps.composio && composioMcpUrl(env)) {
-    servers.composio = {
-      type: 'http',
-      url: composioMcpUrl(env),
-      headers: { 'x-api-key': env.COMPOSIO_API_KEY || '' },
-    }
-  }
-  if (mcps.obsidian) {
-    servers.obsidian = {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-filesystem', ctx.vaultPath],
-    }
-  }
-  if (mcps.exa) {
-    servers.exa = {
-      command: 'npx',
-      args: ['-y', 'exa-mcp-server'],
-      env: { EXA_API_KEY: env.EXA_API_KEY || '' },
-    }
-  }
-  if (mcps.apify) {
-    servers.apify = {
-      command: 'npx',
-      args: ['-y', '@apify/actors-mcp-server'],
-      env: { APIFY_TOKEN: env.APIFY_TOKEN || '' },
-    }
-  }
-
-  return { mcpServers: servers }
+export function renderMcpJson(ctx) {
+  return { mcpServers: renderMcpServers(ctx) }
 }
 
 export function renderClaudeDesktopConfig(ctx) {
-  const mcps = ctx.mcps || {}
-  const env = ctx.env || {}
-  const servers = {}
-
-  // Only emit composio once it's actually provisioned. A blank url (provision
-  // skipped, or a --configs-only re-render before the URL was minted) yields an
-  // http server that silently fails to connect - so the agent believes Gmail is
-  // wired when it isn't. Gate on the URL being present.
-  if (mcps.composio && composioMcpUrl(env)) {
-    servers.composio = {
-      type: 'http',
-      url: composioMcpUrl(env),
-      headers: { 'x-api-key': env.COMPOSIO_API_KEY || '' },
-    }
-  }
-  if (mcps.obsidian) {
-    servers.obsidian = {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-filesystem', ctx.vaultPath],
-    }
-  }
-  if (mcps.tavily) {
-    servers.tavily = {
-      command: 'npx',
-      args: ['-y', 'tavily-mcp'],
-      env: { TAVILY_API_KEY: env.TAVILY_API_KEY || '' },
-    }
-  }
-  if (mcps.exa) {
-    servers.exa = {
-      command: 'npx',
-      args: ['-y', 'exa-mcp-server'],
-      env: { EXA_API_KEY: env.EXA_API_KEY || '' },
-    }
-  }
-  if (mcps.firecrawl) {
-    servers.firecrawl = {
-      command: 'npx',
-      args: ['-y', 'firecrawl-mcp'],
-      env: { FIRECRAWL_API_KEY: env.FIRECRAWL_API_KEY || '' },
-    }
-  }
-
-  return { mcpServers: servers }
+  return { mcpServers: renderMcpServers(ctx) }
 }
 
 export function renderSettingsJson(ctx) {

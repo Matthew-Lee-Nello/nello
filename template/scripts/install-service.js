@@ -269,10 +269,29 @@ function stopDaemon() {
 function startDaemon() {
   if (platform() === 'darwin') {
     const plist = join(homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`)
-    // bootstrap re-loads from the on-disk plist; if it's already loaded, kickstart it.
-    const r = spawnSync('launchctl', ['bootstrap', `gui/${macUid()}`, plist], { stdio: 'ignore' })
-    if (r.status !== 0) spawnSync('launchctl', ['kickstart', '-k', `gui/${macUid()}/${LABEL}`], { stdio: 'ignore' })
+    // Always bootout THEN bootstrap so the daemon is guaranteed to reload the current
+    // on-disk code. The old code relied on `bootstrap` returning non-zero when already
+    // loaded (then falling back to kickstart) — undocumented and not contractually safe:
+    // if bootstrap ever returns 0 on a redundant load, a post-rollback start would leave
+    // the BROKEN daemon running while git is on the rolled-back code (split-brain). bootout
+    // is a no-op if it isn't loaded, so this is safe whether the daemon was up or down.
+    spawnSync('launchctl', ['bootout', `gui/${macUid()}/${LABEL}`], { stdio: 'ignore' })
+    spawnSync('launchctl', ['bootstrap', `gui/${macUid()}`, plist], { stdio: 'ignore' })
   } else if (platform() === 'win32') {
+    // Idempotent: kill any LIVE daemon before spawning, so a double start (apply()'s
+    // finally + the post-rollback start) can't stack two daemons fighting the dashboard
+    // port and the Telegram long-poll. Unlike launchctl/systemd, `start` here always
+    // spawns a fresh process, so single-instance has to be enforced by hand.
+    const pidFile = join(INSTALL, 'store', 'clawd.pid')
+    try {
+      if (existsSync(pidFile)) {
+        const pid = readFileSync(pidFile, 'utf-8').trim()
+        if (pid) {
+          const probe = spawnSync('tasklist', ['/FI', `PID eq ${pid}`], { encoding: 'utf-8' })
+          if (probe.stdout && probe.stdout.includes(pid)) spawnSync('taskkill', ['/PID', pid, '/F'], { stdio: 'ignore' })
+        }
+      }
+    } catch {}
     const wrapper = join(INSTALL, 'nello-daemon.cmd')
     if (existsSync(wrapper)) { try { spawn('cmd', ['/c', 'start', '/min', '""', wrapper], { detached: true, stdio: 'ignore' }).unref() } catch {} }
   } else {
@@ -299,8 +318,20 @@ function jitterMinute() {
   for (const c of INSTALL) h = (h * 31 + c.charCodeAt(0)) >>> 0
   return h % 60
 }
+// Per-install hour in a DAYTIME window (10:00-17:00). The check used to fire Sun 04:00 -
+// the exact time a laptop is asleep, so a notify-first owner never saw the "update ready"
+// ping (and StartCalendarInterval on macOS only catches up loosely on wake). A daytime
+// hour is far likelier to land while the machine is on, and a per-install hour also spreads
+// the fleet across an 8h window instead of all firing in the same minute.
+function jitterHour() {
+  let h = 5381
+  for (const c of INSTALL) h = (h * 33 + c.charCodeAt(0)) >>> 0
+  return 10 + (h % 8)  // 10..17
+}
 const UPDATE_MIN = jitterMinute()
 const UPDATE_MIN2 = String(UPDATE_MIN).padStart(2, '0')
+const UPDATE_HOUR = jitterHour()
+const UPDATE_HOUR2 = String(UPDATE_HOUR).padStart(2, '0')
 
 function installUpdateTimer() {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(UPDATE_LABEL)) {
@@ -325,7 +356,7 @@ function installUpdateTimer() {
     <key>StartCalendarInterval</key>
     <dict>
         <key>Weekday</key><integer>0</integer>
-        <key>Hour</key><integer>4</integer>
+        <key>Hour</key><integer>${UPDATE_HOUR}</integer>
         <key>Minute</key><integer>${UPDATE_MIN}</integer>
     </dict>
     <key>StandardOutPath</key>
@@ -347,7 +378,7 @@ function installUpdateTimer() {
     writeFileSync(dest, plist)
     spawnSync('launchctl', ['bootout', `gui/${macUid()}/${UPDATE_LABEL}`], { stdio: 'ignore' })
     const r = spawnSync('launchctl', ['bootstrap', `gui/${macUid()}`, dest], { stdio: 'pipe' })
-    if (r.status === 0) ok(`weekly update check registered (${UPDATE_LABEL}, Sun 04:${UPDATE_MIN2})`)
+    if (r.status === 0) ok(`weekly update check registered (${UPDATE_LABEL}, Sun ${UPDATE_HOUR2}:${UPDATE_MIN2})`)
     else fail(`update timer load failed: ${r.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
   } else if (platform() === 'win32') {
     const wrapper = join(INSTALL, 'nello-update.cmd')
@@ -358,8 +389,8 @@ function installUpdateTimer() {
       `set "PATH=${NODE_BIN};${BUN_BIN};%PATH%"\r\n` +
       `"${NODE}" "${SELF_UPDATE}" >> "${logFile}" 2>&1\r\n`)
     spawnSync('schtasks', ['/Delete', '/F', '/TN', UPDATE_LABEL], { stdio: 'ignore' })
-    const w = spawnSync('schtasks', ['/Create', '/F', '/TN', UPDATE_LABEL, '/TR', `"${wrapper}"`, '/SC', 'WEEKLY', '/D', 'SUN', '/ST', `04:${UPDATE_MIN2}`, '/RL', 'LIMITED'], { stdio: 'ignore' })
-    if (w.status === 0) ok(`weekly update check registered (${UPDATE_LABEL}, Sun 04:${UPDATE_MIN2})`)
+    const w = spawnSync('schtasks', ['/Create', '/F', '/TN', UPDATE_LABEL, '/TR', `"${wrapper}"`, '/SC', 'WEEKLY', '/D', 'SUN', '/ST', `${UPDATE_HOUR2}:${UPDATE_MIN2}`, '/RL', 'LIMITED'], { stdio: 'ignore' })
+    if (w.status === 0) ok(`weekly update check registered (${UPDATE_LABEL}, Sun ${UPDATE_HOUR2}:${UPDATE_MIN2})`)
     else fail('update timer registration skipped (updates still available via /update)')
   } else {
     const svc = join(homedir(), '.config', 'systemd', 'user', `${UPDATE_LABEL}.service`)
@@ -381,7 +412,7 @@ StandardError=append:${INSTALL}/store/self-update.log
 Description=nello weekly self-update timer
 
 [Timer]
-OnCalendar=Sun *-*-* 04:${UPDATE_MIN2}:00
+OnCalendar=Sun *-*-* ${UPDATE_HOUR2}:${UPDATE_MIN2}:00
 Persistent=true
 
 [Install]

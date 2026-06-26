@@ -3,7 +3,7 @@ const { parseExpression } = cronParser
 import {
   claimDueTasks, releaseTask, recoverStaleClaims,
   bumpTaskFailure, resetTaskFailures, setTaskStatus,
-  runAgent,
+  runAgent, hintToModel,
   SCHEDULER_POLL_MS,
   logger,
 } from '@nello/core'
@@ -13,6 +13,19 @@ export type Sender = (chatId: string, text: string) => Promise<void>
 // Circuit-breaker: after this many consecutive failed runs, pause the task so a broken
 // job (a wedged auto-fetch, a revoked token) stops spending an agent turn every tick.
 const MAX_CONSECUTIVE_FAILURES = 5
+
+// Auto-fetch runs every ~20 min, unattended, 72×/day. It must NOT run on the Sonnet
+// default: pin it to the cheap model its SKILL.md already declares (`model_hint: fast`)
+// and cap turns as a runaway-loop backstop (generous — a normal busy tick is well under
+// this; the cap only catches a wedged tool-call loop, it is not a throughput limit).
+const AUTO_FETCH_SIGNATURE = '/auto-fetch'
+const AUTO_FETCH_MAX_TURNS = 60
+function agentOptsFor(prompt: string): { model: string; maxTurns: number } | undefined {
+  if (prompt.includes(AUTO_FETCH_SIGNATURE)) {
+    return { model: hintToModel('fast'), maxTurns: AUTO_FETCH_MAX_TURNS }
+  }
+  return undefined
+}
 
 export function computeNextRun(cronExpression: string, from: Date = new Date()): number {
   try {
@@ -51,9 +64,14 @@ export function initScheduler(send: Sender): void {
         let failed = false
         try {
           logger.info({ id: task.id, prompt: task.prompt.slice(0, 80) }, 'Running task')
-          const result = await runAgent(task.prompt)
-          resultText = result.text || '(no output)'
+          const result = await runAgent(task.prompt, undefined, undefined, agentOptsFor(task.prompt))
+          resultText = result.text?.trim() || '(no output)'
           await send(task.chat_id, resultText)
+          // NOTE: an empty result is NOT counted as a breaker failure. A capped haiku tick
+          // can legitimately end on a tool call with no final text, and with the cheap model
+          // + turn cap + code-enforced dedup a no-op tick is now cheap — so treating empty as
+          // failure would false-trip and self-pause a healthy job. The breaker trips on a
+          // genuine throw (revoked token, crash) below, which is its real job.
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
           logger.error({ id: task.id, err }, 'Task failed')

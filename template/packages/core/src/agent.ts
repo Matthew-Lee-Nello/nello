@@ -9,6 +9,19 @@ export interface RunAgentResult {
   newSessionId?: string
 }
 
+/**
+ * Per-call overrides for an agent turn.
+ * - `model`     pins a concrete Anthropic model (e.g. resolve a skill's
+ *               `model_hint: fast` via hintToModel) so a cheap background job
+ *               like auto-fetch doesn't silently run on the Sonnet default.
+ * - `maxTurns`  hard ceiling on assistant turns — a runaway-loop backstop for
+ *               unattended ticks, NOT a throughput knob. Leave generous.
+ */
+export interface AgentOptions {
+  model?: string
+  maxTurns?: number
+}
+
 export type AgentEvent =
   | { type: 'init'; sessionId: string | undefined }
   | { type: 'thinking'; text?: string }
@@ -27,9 +40,10 @@ export type AgentEvent =
 export async function runAgent(
   message: string,
   sessionId?: string,
-  onTyping?: () => void
+  onTyping?: () => void,
+  opts?: AgentOptions,
 ): Promise<RunAgentResult> {
-  return runAgentStream(message, sessionId, undefined, onTyping)
+  return runAgentStream(message, sessionId, undefined, onTyping, opts)
 }
 
 /**
@@ -41,6 +55,7 @@ export async function runAgentStream(
   sessionId?: string,
   onEvent?: (e: AgentEvent) => void,
   onTyping?: () => void,
+  opts?: AgentOptions,
 ): Promise<RunAgentResult> {
   let typingTimer: NodeJS.Timeout | null = null
   if (onTyping) {
@@ -57,6 +72,8 @@ export async function runAgentStream(
       options: {
         cwd: PROJECT_ROOT,
         ...(resume ? { resume } : {}),
+        ...(opts?.model ? { model: opts.model } : {}),
+        ...(opts?.maxTurns ? { maxTurns: opts.maxTurns } : {}),
         settingSources: AGENT_SETTING_SOURCES as SettingSource[],
         permissionMode: 'bypassPermissions',
         // Surface the bundled CLI's own stderr so failures (e.g. "Prompt is too long")
