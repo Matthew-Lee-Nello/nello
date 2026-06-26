@@ -24,7 +24,7 @@
  */
 
 import { execSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, cpSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, cpSync, rmSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 
@@ -149,17 +149,20 @@ function salvageAndReset() {
 function run(cmd) {
   log(`$ ${cmd}`)
   const r = spawnSync(cmd, { cwd: INSTALL, shell: true, stdio: 'pipe', env: { ...process.env, NC_INSTALL_PATH: INSTALL } })
-  return { ok: r.status === 0, out: (r.stdout?.toString() || '') + (r.stderr?.toString() || '') }
+  return { ok: r.status === 0, status: r.status, out: (r.stdout?.toString() || '') + (r.stderr?.toString() || '') }
 }
 
 // pnpm may not be on the timer's minimal PATH even when it's on the user's shell PATH.
 // Try it by name, then corepack, then npx, so an environmental PATH gap doesn't read as
-// a build failure (which would otherwise trigger a needless rollback).
+// a build failure. Fall through ONLY when the LAUNCHER itself is missing (shell exit 127
+// on posix, or the Windows "is not recognized" message) - a real build failure (exit 1,
+// "Module not found", a registry 404) is returned as-is so we don't mask it.
 function pnpm(args) {
   for (const base of ['pnpm', 'corepack pnpm', 'npx --yes pnpm']) {
     const r = run(`${base} ${args}`)
     if (r.ok) return r
-    if (!/not found|command not found|ENOENT|not recognized/i.test(r.out)) return r  // a real build error, not a missing pnpm
+    const launcherMissing = r.status === 127 || /is not recognized as an internal or external/i.test(r.out)
+    if (!launcherMissing) return r
   }
   return { ok: false, out: 'pnpm not resolvable (tried pnpm, corepack, npx)' }
 }
@@ -195,8 +198,12 @@ async function verifyGate(buildOk) {
     const q = spawnSync(GBRAIN_BIN, ['query', 'healthcheck', '--limit', '1'], {
       env: { ...process.env, HOME: homedir(), OPENAI_API_KEY: key }, encoding: 'utf-8', timeout: 20000,
     })
+    // Couldn't even run (ENOENT, timeout) = the engine the update should have left working
+    // isn't. An empty store still exits 0 with no hits + no error, so it passes.
+    if (q.error) return { ok: false, why: `brain query could not run (${q.error.message?.split('\n')[0] || 'spawn error'})` }
     const out = (q.stdout || '') + (q.stderr || '')
-    if (/401|unauthor|invalid.*api.*key|incorrect api key/i.test(out)) return { ok: false, why: 'brain query rejected (OpenAI key invalid after update)' }
+    if (/unauthor|invalid api key|incorrect api key|\b401\b/i.test(out)) return { ok: false, why: 'brain query rejected (OpenAI key invalid after update)' }
+    if (/dimension mismatch|vector dimension|expected \d+ dimensions/i.test(out)) return { ok: false, why: 'brain store dimension mismatch after update' }
   }
   return { ok: true }
 }
@@ -208,9 +215,15 @@ function rollback(snap) {
     const bak = join(snap.dir, f)
     if (existsSync(bak)) { try { copyFileSync(bak, join(INSTALL, f)) } catch {} }
   }
-  // Restore the gbrain store if the failed apply wiped it.
+  // Restore the gbrain store if the failed apply wiped it - but only from a NON-EMPTY
+  // backup, so a torn/empty snapshot can never replace a real brain with nothing.
   const gbak = join(snap.dir, 'gbrain')
-  if (existsSync(gbak)) { try { rmSync(GBRAIN_DIR, { recursive: true, force: true }); cpSync(gbak, GBRAIN_DIR, { recursive: true }) } catch {} }
+  try {
+    if (existsSync(gbak) && readdirSync(gbak).length > 0) {
+      rmSync(GBRAIN_DIR, { recursive: true, force: true })
+      cpSync(gbak, GBRAIN_DIR, { recursive: true })
+    }
+  } catch {}
   const b = build()   // rebuild the OLD code; report if THIS fails (a louder problem)
   return b.ok
 }
@@ -236,15 +249,24 @@ async function apply(remoteSha, oldVer) {
     }
   } catch {}
 
-  const snap = snapshot()
+  // Stop the daemon FIRST so it isn't writing ~/.gbrain while we snapshot it, then take a
+  // quiescent snapshot. The whole mutate region is guarded: if salvage/reset/build/migrate
+  // throws, b stays not-ok (-> rollback) and the daemon is always restarted in finally.
   daemon('stop')
-  const salvaged = salvageAndReset()
+  const snap = snapshot()
+  let salvaged = 0
+  let b = { ok: false, out: '' }
+  try {
+    salvaged = salvageAndReset()
+    b = build()
+    if (b.ok) { const boot = run('node ./template/bootstrap.js'); if (!boot.ok) b = { ok: false, out: boot.out } }
+  } catch (e) {
+    b = { ok: false, out: `update threw: ${e.message?.split('\n')[0] || e}` }
+  } finally {
+    daemon('start')
+  }
 
-  let b = build()
-  if (b.ok) { const boot = run('node ./template/bootstrap.js'); if (!boot.ok) b = { ok: false, out: boot.out } }
-  daemon('start')
-
-  const gate = await verifyGate(b.ok)
+  const gate = b.ok ? await verifyGate(true) : { ok: false, why: (b.out || 'build/migrate failed').split('\n')[0].slice(0, 200) }
   if (!gate.ok) {
     const restoredOk = rollback(snap)
     daemon('start')

@@ -276,7 +276,10 @@ function startDaemon() {
     const wrapper = join(INSTALL, 'nello-daemon.cmd')
     if (existsSync(wrapper)) { try { spawn('cmd', ['/c', 'start', '/min', '""', wrapper], { detached: true, stdio: 'ignore' }).unref() } catch {} }
   } else {
-    spawnSync('systemctl', ['--user', 'start', LABEL], { stdio: 'ignore' })
+    // `restart` not `start`: on a rollback the unit may still be "active" running the
+    // just-reset code, and `start` is a no-op on an active unit - restart guarantees a
+    // clean cycle onto the current tree (and still starts it if it was stopped).
+    spawnSync('systemctl', ['--user', 'restart', LABEL], { stdio: 'ignore' })
   }
   ok(`daemon started (${LABEL})`)
 }
