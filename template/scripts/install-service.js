@@ -281,11 +281,23 @@ function startDaemon() {
   ok(`daemon started (${LABEL})`)
 }
 
-// ---------- weekly self-update timer (Phase C) ----------
-// A second scheduled job, label com.nello.update, that runs self-update.js headlessly
-// once a week. Mirrors the daemon-install pattern per OS. Idempotent.
+// ---------- weekly update timer (Phase C) ----------
+// A second scheduled job, label com.nello.update, that runs self-update.js once a week.
+// By default self-update.js only NOTIFIES the owner that an update is ready (it never
+// touches the box unattended); unattended apply is opt-in (enableAutoUpdate==='auto').
+// Mirrors the daemon-install pattern per OS. Idempotent.
 const UPDATE_LABEL = process.env.NC_UPDATE_LABEL || LABEL.replace(/\.server$/, '.update')
 const SELF_UPDATE = join(INSTALL, 'template', 'scripts', 'self-update.js')
+
+// Per-install minute (0-59) from the install path, so the whole fleet doesn't all fire
+// in the same wall-clock minute (thundering herd against GitHub / OpenAI).
+function jitterMinute() {
+  let h = 0
+  for (const c of INSTALL) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return h % 60
+}
+const UPDATE_MIN = jitterMinute()
+const UPDATE_MIN2 = String(UPDATE_MIN).padStart(2, '0')
 
 function installUpdateTimer() {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(UPDATE_LABEL)) {
@@ -311,7 +323,7 @@ function installUpdateTimer() {
     <dict>
         <key>Weekday</key><integer>0</integer>
         <key>Hour</key><integer>4</integer>
-        <key>Minute</key><integer>17</integer>
+        <key>Minute</key><integer>${UPDATE_MIN}</integer>
     </dict>
     <key>StandardOutPath</key>
     <string>${INSTALL}/store/self-update.log</string>
@@ -332,8 +344,8 @@ function installUpdateTimer() {
     writeFileSync(dest, plist)
     spawnSync('launchctl', ['bootout', `gui/${macUid()}/${UPDATE_LABEL}`], { stdio: 'ignore' })
     const r = spawnSync('launchctl', ['bootstrap', `gui/${macUid()}`, dest], { stdio: 'pipe' })
-    if (r.status === 0) ok(`weekly auto-update timer registered (${UPDATE_LABEL}, Sun 04:17)`)
-    else fail(`auto-update timer load failed: ${r.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
+    if (r.status === 0) ok(`weekly update check registered (${UPDATE_LABEL}, Sun 04:${UPDATE_MIN2})`)
+    else fail(`update timer load failed: ${r.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
   } else if (platform() === 'win32') {
     const wrapper = join(INSTALL, 'nello-update.cmd')
     const logFile = join(INSTALL, 'store', 'self-update.log')
@@ -343,9 +355,9 @@ function installUpdateTimer() {
       `set "PATH=${NODE_BIN};${BUN_BIN};%PATH%"\r\n` +
       `"${NODE}" "${SELF_UPDATE}" >> "${logFile}" 2>&1\r\n`)
     spawnSync('schtasks', ['/Delete', '/F', '/TN', UPDATE_LABEL], { stdio: 'ignore' })
-    const w = spawnSync('schtasks', ['/Create', '/F', '/TN', UPDATE_LABEL, '/TR', `"${wrapper}"`, '/SC', 'WEEKLY', '/D', 'SUN', '/ST', '04:17', '/RL', 'LIMITED'], { stdio: 'ignore' })
-    if (w.status === 0) ok(`weekly auto-update task registered (${UPDATE_LABEL})`)
-    else fail('auto-update task registration skipped (updates still available via /update)')
+    const w = spawnSync('schtasks', ['/Create', '/F', '/TN', UPDATE_LABEL, '/TR', `"${wrapper}"`, '/SC', 'WEEKLY', '/D', 'SUN', '/ST', `04:${UPDATE_MIN2}`, '/RL', 'LIMITED'], { stdio: 'ignore' })
+    if (w.status === 0) ok(`weekly update check registered (${UPDATE_LABEL}, Sun 04:${UPDATE_MIN2})`)
+    else fail('update timer registration skipped (updates still available via /update)')
   } else {
     const svc = join(homedir(), '.config', 'systemd', 'user', `${UPDATE_LABEL}.service`)
     const tim = join(homedir(), '.config', 'systemd', 'user', `${UPDATE_LABEL}.timer`)
@@ -366,7 +378,7 @@ StandardError=append:${INSTALL}/store/self-update.log
 Description=nello weekly self-update timer
 
 [Timer]
-OnCalendar=Sun *-*-* 04:17:00
+OnCalendar=Sun *-*-* 04:${UPDATE_MIN2}:00
 Persistent=true
 
 [Install]
@@ -374,8 +386,8 @@ WantedBy=timers.target
 `)
     spawnSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'ignore' })
     const e = spawnSync('systemctl', ['--user', 'enable', '--now', `${UPDATE_LABEL}.timer`], { stdio: 'pipe' })
-    if (e.status === 0) ok(`weekly auto-update timer enabled (${UPDATE_LABEL}.timer)`)
-    else fail(`auto-update timer enable failed: ${e.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
+    if (e.status === 0) ok(`weekly update check enabled (${UPDATE_LABEL}.timer, Sun 04:${UPDATE_MIN2})`)
+    else fail(`update timer enable failed: ${e.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
   }
 }
 

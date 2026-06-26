@@ -1517,20 +1517,20 @@ async function main() {
     installService()
   }
 
-  // Weekly unattended self-update timer (Phase C). Gated on enableAutoUpdate (default on)
+  // Weekly update-check timer (Phase C). Gated on enableAutoUpdate !== false (default on)
   // and only when the daemon service is installed (shares the same per-OS service infra).
-  // The timer runs template/scripts/self-update.js, which pull -> build -> migrate ->
-  // verify -> rolls back on any failure, so a bad week leaves the box on its prior
-  // working version. Best-effort: a failed timer never blocks the install; /update still
-  // works by hand.
+  // The timer runs template/scripts/self-update.js: by DEFAULT it only NOTIFIES the owner
+  // that an update is ready (never touches the box unattended). Unattended apply (with
+  // salvage + verify + rollback) is opt-in via enableAutoUpdate === 'auto'. Best-effort:
+  // a failed timer never blocks the install; /update still works by hand.
   if (bundle.installLaunchAgent && bundle.enableAutoUpdate !== false) {
-    info('Registering weekly auto-update timer')
+    info('Registering weekly update check')
     try {
       spawnSync('node', [join(TEMPLATE_DIR, 'scripts', 'install-service.js'), 'update-timer'], {
         stdio: 'inherit',
         env: { ...process.env, NC_INSTALL_PATH: INSTALL_PATH },
       })
-    } catch (e) { warn(`auto-update timer registration skipped (${e.message?.split('\n')[0] || 'unknown'}); /update still works`) }
+    } catch (e) { warn(`update-check timer registration skipped (${e.message?.split('\n')[0] || 'unknown'}); /update still works`) }
   }
 
   if (bundle.enableMorningBrief) {

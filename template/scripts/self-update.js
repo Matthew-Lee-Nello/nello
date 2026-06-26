@@ -2,36 +2,43 @@
 /**
  * Safe self-merging update engine.
  *
- * The problem it solves: the interactive /update used `git pull --ff-only`, which a
- * single client edit to a TRACKED product file makes refuse - freezing the install on
- * stale update code (the chicken-and-egg that left an old client unable to pick up new
- * stack changes). This script salvages any such edits, hard-resets product files to
- * origin/main, rebuilds, runs the migrations + render, verifies, and AUTO-ROLLS-BACK on
- * any failure - so the box is either fully on the verified new version or fully back on
- * the old one. Client state (.env, bundle.json, vault/, store/, .mcp.json) is gitignored,
- * so the reset never touches it; the 4 files git can't restore are snapshotted first.
+ * Two jobs:
+ *  1. Make the interactive /update unstickable. `git pull --ff-only` refuses when a
+ *     client edited a TRACKED product file - the chicken-and-egg that froze old installs.
+ *     `--salvage-reset` salvages those edits and moves product files to origin/main.
+ *  2. Power the weekly timer. By DEFAULT the timer runs NOTIFY mode: it only checks
+ *     whether an update is pending and Telegrams the owner to run /update - it never
+ *     touches the box unattended. Full unattended apply (stop -> reset -> build ->
+ *     migrate -> verify -> rollback) is opt-in via bundle.enableAutoUpdate === 'auto'.
+ *
+ * Client state (.env, bundle.json, vault/, store/, .mcp.json) is gitignored, so the
+ * reset never touches it; the pieces git can't restore (.env/bundle.json/.mcp.json/
+ * .nello-version AND ~/.gbrain) are snapshotted first and restored on rollback.
  *
  * Modes:
- *   (default)         full unattended update: snapshot -> stop -> salvage -> reset ->
- *                     build -> migrate -> verify -> (rollback on fail) -> start -> announce
- *   --salvage-reset   JUST the git unstick (snapshot + salvage + hard-reset to origin/main),
- *                     for the interactive /update skill to call when ff-only is refused;
- *                     the skill then continues with its own build + key prompts.
+ *   (default)         weekly entry. NOTIFY unless enableAutoUpdate==='auto' (then APPLY).
+ *   --salvage-reset   just the safe git unstick, for the interactive /update skill.
+ *   --apply           force the full unattended apply (used internally / for testing).
  *
  * Run from the install root (or with NC_INSTALL_PATH set). Headless: never prompts.
  */
 
 import { execSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, cpSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const INSTALL = process.env.NC_INSTALL_PATH || process.cwd()
 const TEMPLATE_DIR = join(INSTALL, 'template')
 const STORE_DIR = join(INSTALL, 'store')
+const ROLLBACK_ROOT = join(INSTALL, '.nello-rollback')
 const LOCK = join(STORE_DIR, 'update.lock')
+const LAST_FAILED = join(ROLLBACK_ROOT, 'last-failed-commit')
+const GBRAIN_DIR = join(homedir(), '.gbrain')
+const GBRAIN_BIN = join(homedir(), '.bun', 'bin', 'gbrain')
 const EXPECTED_REMOTE = 'Matthew-Lee-Nello/nello'
 const SALVAGE_ONLY = process.argv.includes('--salvage-reset')
+const FORCE_APPLY = process.argv.includes('--apply')
 
 const ACCENT = '\x1b[38;2;255;166;0m'
 const RED = '\x1b[38;2;255;80;80m'
@@ -50,6 +57,9 @@ function readEnvVal(key) {
     return m ? m[1].replace(/^["']|["']$/g, '').trim() : null
   } catch { return null }
 }
+function readBundle() {
+  try { return JSON.parse(readFileSync(join(INSTALL, 'bundle.json'), 'utf-8')) } catch { return {} }
+}
 
 async function telegram(text) {
   const token = readEnvVal('TELEGRAM_BOT_TOKEN')
@@ -65,13 +75,14 @@ async function telegram(text) {
 }
 
 function stamp() { return new Date().toISOString().replace(/[:.]/g, '-') }
+function verOf(ref) { const r = tryGit(`show ${ref}:VERSION`); return r.ok ? r.out.trim() : null }
 
-// --- preflight: refuse to hard-reset onto a stranger's main ---
+// --- preflight: refuse to touch a repo that isn't ours ---
 function preflight() {
   if (!existsSync(join(INSTALL, '.git'))) { err(`${INSTALL} is not a git repo - cannot self-update. Re-clone from github.com/${EXPECTED_REMOTE}.`); process.exit(2) }
   const remote = tryGit('remote get-url origin')
   if (!remote.ok || !remote.out.includes(EXPECTED_REMOTE)) {
-    err(`origin is ${remote.out || 'unset'}, not ${EXPECTED_REMOTE}. Refusing to hard-reset onto an unknown remote.`)
+    err(`origin is ${remote.out || 'unset'}, not ${EXPECTED_REMOTE}. Refusing to reset onto an unknown remote.`)
     process.exit(2)
   }
 }
@@ -87,27 +98,27 @@ function acquireLock() {
   mkdirSync(STORE_DIR, { recursive: true })
   writeFileSync(LOCK, String(Date.now()))
 }
-function releaseLock() { try { if (existsSync(LOCK)) execSync(`rm -f "${LOCK}"`) } catch {} }
+function releaseLock() { try { if (existsSync(LOCK)) rmSync(LOCK, { force: true }) } catch {} }
 
-// --- snapshot the 4 files git can't restore + record the rollback commit ---
+// --- snapshot the state git can't restore: the 4 files AND the gbrain store ---
 function snapshot() {
-  const dir = join(INSTALL, '.nello-rollback', stamp())
+  const dir = join(ROLLBACK_ROOT, stamp())
   mkdirSync(dir, { recursive: true })
   for (const f of ['.env', 'bundle.json', '.mcp.json', '.nello-version']) {
     const src = join(INSTALL, f)
     if (existsSync(src)) { try { copyFileSync(src, join(dir, f)) } catch {} }
   }
+  // The gbrain store is the 5th piece of unsnapshotted state migration 0002 may wipe
+  // mid-bootstrap; back it up so a failed apply can restore a working brain.
+  if (existsSync(GBRAIN_DIR)) { try { cpSync(GBRAIN_DIR, join(dir, 'gbrain'), { recursive: true }) } catch {} }
   const commit = tryGit('rev-parse HEAD').out
   writeFileSync(join(dir, 'ROLLBACK_COMMIT'), commit)
   return { dir, commit }
 }
 
-// --- salvage client edits to tracked product files, then hard-reset to origin/main ---
+// --- salvage client edits to tracked product files, then reset to origin/main ---
+// Returns the number of edits set aside, so the caller can tell the owner.
 function salvageAndReset() {
-  // Only tracked files show here (client state is gitignored), so this lists exactly
-  // the product-file edits the hard-reset is about to discard. Capture each as a diff
-  // into the overlay quarantine so nothing is silently lost; a shipped skill edit also
-  // gets copied into client-overlay/skills so it keeps loading after the reset.
   const status = tryGit('status --porcelain --untracked-files=no').out
   const edited = status.split('\n').map(l => l.slice(3).trim()).filter(Boolean)
   if (edited.length) {
@@ -120,63 +131,72 @@ function salvageAndReset() {
       const m = f.match(/^template\/skills\/([^/]+)\//)
       if (m) {
         const dst = join(INSTALL, 'client-overlay', 'skills', m[1])
-        try { mkdirSync(dst, { recursive: true }); execSync(`cp -R "${join(INSTALL, 'template', 'skills', m[1])}/." "${dst}/"`) } catch {}
+        try { mkdirSync(dst, { recursive: true }); cpSync(join(INSTALL, 'template', 'skills', m[1]), dst, { recursive: true }) } catch {}
       }
     }
     log(`salvaged ${edited.length} local edit(s) to client-overlay/quarantine`)
   }
   // Discard working-tree changes to tracked files and move product state to origin/main.
-  // NOT `git stash -u` (that would sweep untracked client state); NOT a merge (could
-  // leave conflict markers on a non-technical box). Hard-reset is convergent + clean.
+  // NOT `git stash -u` (would sweep untracked client state); NOT a merge (could leave
+  // conflict markers on a non-technical box). On an attached `main` this is convergent.
   git('checkout -- .')
   const branch = tryGit('rev-parse --abbrev-ref HEAD').out
   if (branch === 'HEAD' || !branch) tryGit('checkout main')
   git('reset --hard origin/main')
+  return edited.length
 }
 
 function run(cmd) {
   log(`$ ${cmd}`)
   const r = spawnSync(cmd, { cwd: INSTALL, shell: true, stdio: 'pipe', env: { ...process.env, NC_INSTALL_PATH: INSTALL } })
-  const out = (r.stdout?.toString() || '') + (r.stderr?.toString() || '')
-  return { ok: r.status === 0, out }
+  return { ok: r.status === 0, out: (r.stdout?.toString() || '') + (r.stderr?.toString() || '') }
 }
 
+// pnpm may not be on the timer's minimal PATH even when it's on the user's shell PATH.
+// Try it by name, then corepack, then npx, so an environmental PATH gap doesn't read as
+// a build failure (which would otherwise trigger a needless rollback).
+function pnpm(args) {
+  for (const base of ['pnpm', 'corepack pnpm', 'npx --yes pnpm']) {
+    const r = run(`${base} ${args}`)
+    if (r.ok) return r
+    if (!/not found|command not found|ENOENT|not recognized/i.test(r.out)) return r  // a real build error, not a missing pnpm
+  }
+  return { ok: false, out: 'pnpm not resolvable (tried pnpm, corepack, npx)' }
+}
 function build() {
-  let r = run('pnpm install --frozen-lockfile')
-  if (!r.ok) r = run('pnpm install')
+  let r = pnpm('install --frozen-lockfile')
+  if (!r.ok) r = pnpm('install')
   if (!r.ok) return { ok: false, out: r.out }
-  return run('pnpm -r build')
+  return pnpm('-r build')
+}
+
+function daemon(action) {
+  spawnSync('node', [join(TEMPLATE_DIR, 'scripts', 'install-service.js'), action], { cwd: INSTALL, stdio: 'inherit', env: { ...process.env, NC_INSTALL_PATH: INSTALL } })
 }
 
 // --- verify gate: did the update leave a WORKING box? ---
-// Hard requirements: build succeeded + daemon answers health. A missing OPENAI_API_KEY
-// is NOT a failure (the box never had a brain; the announce asks the owner to paste it).
-// But a brain that WAS on must not be left broken by the update - so when a key is
-// present, the gbrain config must be on the OpenAI/1536 target. (Migration 0002 already
-// guarantees it never wipes a keyless brain, so this only fires on a genuine regression.)
+// Hard: build OK + daemon answers health. A missing OPENAI_API_KEY is NOT a failure
+// (0002 never wipes a keyless brain). When a key IS present and the engine + config are
+// in place, a live gbrain query must not 401 - that catches a brain the update broke
+// (rotated/rejected key, bad config) without false-failing on an absent/environmental
+// gbrain or an empty store (a query on an empty store returns no hits, not an error).
 async function verifyGate(buildOk) {
   if (!buildOk) return { ok: false, why: 'build failed' }
   const port = readEnvVal('DASHBOARD_PORT') || '3000'
   let healthy = false
   for (let i = 0; i < 30; i++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/monitoring/health`, { signal: AbortSignal.timeout(2000) })
-      if (res.ok) { healthy = true; break }
-    } catch {}
+    try { if ((await fetch(`http://127.0.0.1:${port}/api/monitoring/health`, { signal: AbortSignal.timeout(2000) })).ok) { healthy = true; break } } catch {}
     await new Promise(r => setTimeout(r, 1000))
   }
   if (!healthy) return { ok: false, why: 'daemon did not become healthy within 30s' }
 
-  if (readEnvVal('OPENAI_API_KEY')) {
-    const cfgPath = join(homedir(), '.gbrain', 'config.json')
-    if (existsSync(cfgPath)) {
-      try {
-        const cfg = JSON.parse(readFileSync(cfgPath, 'utf-8'))
-        if (!String(cfg.embedding_model || '').startsWith('openai') || Number(cfg.embedding_dimensions) !== 1536) {
-          return { ok: false, why: `brain config is ${cfg.embedding_model}/${cfg.embedding_dimensions}d, not openai/1536` }
-        }
-      } catch { return { ok: false, why: 'brain config unreadable after update' } }
-    }
+  const key = readEnvVal('OPENAI_API_KEY')
+  if (key && existsSync(GBRAIN_BIN) && existsSync(join(GBRAIN_DIR, 'config.json'))) {
+    const q = spawnSync(GBRAIN_BIN, ['query', 'healthcheck', '--limit', '1'], {
+      env: { ...process.env, HOME: homedir(), OPENAI_API_KEY: key }, encoding: 'utf-8', timeout: 20000,
+    })
+    const out = (q.stdout || '') + (q.stderr || '')
+    if (/401|unauthor|invalid.*api.*key|incorrect api key/i.test(out)) return { ok: false, why: 'brain query rejected (OpenAI key invalid after update)' }
   }
   return { ok: true }
 }
@@ -188,62 +208,87 @@ function rollback(snap) {
     const bak = join(snap.dir, f)
     if (existsSync(bak)) { try { copyFileSync(bak, join(INSTALL, f)) } catch {} }
   }
-  build()
+  // Restore the gbrain store if the failed apply wiped it.
+  const gbak = join(snap.dir, 'gbrain')
+  if (existsSync(gbak)) { try { rmSync(GBRAIN_DIR, { recursive: true, force: true }); cpSync(gbak, GBRAIN_DIR, { recursive: true }) } catch {} }
+  const b = build()   // rebuild the OLD code; report if THIS fails (a louder problem)
+  return b.ok
 }
 
-function daemon(action) {
-  spawnSync('node', [join(TEMPLATE_DIR, 'scripts', 'install-service.js'), action], { cwd: INSTALL, stdio: 'inherit', env: { ...process.env, NC_INSTALL_PATH: INSTALL } })
+// ---- NOTIFY mode (the default weekly behaviour) ----
+async function notify(curVer, newVer) {
+  const sent = await telegram(
+    `Nello update ready: v${curVer || '?'} -> v${newVer || '?'}.\n\n` +
+    `Reply /update (or run it) whenever suits to apply it - it takes a minute and nothing is lost (your notes, memory and identity carry over). ` +
+    `Want updates to apply on their own? Set enableAutoUpdate to "auto".`)
+  log(sent ? 'notified owner of pending update' : 'pending update (Telegram not configured)')
+}
+
+// ---- APPLY mode (opt-in: enableAutoUpdate === 'auto') ----
+async function apply(remoteSha, oldVer) {
+  // Loop-breaker: never re-apply the same origin/main commit that already failed here.
+  // Without this a genuinely-broken push would stop->reset->fail->rollback every week.
+  try {
+    if (existsSync(LAST_FAILED) && readFileSync(LAST_FAILED, 'utf-8').trim() === remoteSha) {
+      log('this update already failed once here - notifying instead of re-applying')
+      await notify(oldVer, verOf('origin/main'))
+      return
+    }
+  } catch {}
+
+  const snap = snapshot()
+  daemon('stop')
+  const salvaged = salvageAndReset()
+
+  let b = build()
+  if (b.ok) { const boot = run('node ./template/bootstrap.js'); if (!boot.ok) b = { ok: false, out: boot.out } }
+  daemon('start')
+
+  const gate = await verifyGate(b.ok)
+  if (!gate.ok) {
+    const restoredOk = rollback(snap)
+    daemon('start')
+    try { mkdirSync(ROLLBACK_ROOT, { recursive: true }); writeFileSync(LAST_FAILED, remoteSha) } catch {}
+    const tail = restoredOk
+      ? `You're still on your previous working version (v${oldVer || '?'}); nothing was lost.`
+      : `WARNING: the rollback rebuild also failed - please run /update by hand to recover.`
+    await telegram(`Nello auto-update was rolled back.\n\nReason: ${gate.why}.\n${tail}\nWe won't retry this same update automatically; a future update will apply normally.`)
+    err(`update rolled back: ${gate.why}${restoredOk ? '' : ' (ROLLBACK BUILD ALSO FAILED)'}`)
+    process.exitCode = 1
+    return
+  }
+
+  try { if (existsSync(LAST_FAILED)) rmSync(LAST_FAILED, { force: true }) } catch {}
+  run('node ./template/bootstrap.js --announce')
+  if (salvaged > 0) await telegram(`Heads up: ${salvaged} local edit(s) to Nello's own files were set aside in client-overlay/quarantine during the update (your notes and memory are untouched).`)
+  log('update complete + verified')
 }
 
 async function main() {
   preflight()
 
-  // Salvage-only: the interactive skill's frozen-pull recovery. Fetch, snapshot, salvage,
-  // reset, done - the skill takes over from here (build + key prompts).
+  // Interactive skill's frozen-pull recovery: just the safe git unstick.
   if (SALVAGE_ONLY) {
     tryGit('fetch origin main')
     snapshot()
-    salvageAndReset()
-    log('product files reset to origin/main; client edits salvaged. Continue the update (build + bootstrap).')
+    const n = salvageAndReset()
+    log(`product files reset to origin/main${n ? `; ${n} local edit(s) salvaged to client-overlay/quarantine` : ''}. Continue the update (build + bootstrap).`)
     return
   }
 
   acquireLock()
   try {
-    const fetched = tryGit('fetch origin main')
-    if (!fetched.ok) { err(`git fetch failed: ${fetched.out.split('\n')[0]}`); return }
+    if (!tryGit('fetch origin main').ok) { err('git fetch failed'); return }
     const head = tryGit('rev-parse HEAD').out
     const remote = tryGit('rev-parse origin/main').out
     if (head && remote && head === remote) { log('already up to date - nothing to do'); return }
 
-    const snap = snapshot()
-    const oldVer = (() => { try { return JSON.parse(readFileSync(join(snap.dir, '.nello-version'), 'utf-8')).version } catch { return null } })()
+    const oldVer = verOf('HEAD')
+    const newVer = verOf('origin/main')
+    const wantApply = FORCE_APPLY || readBundle().enableAutoUpdate === 'auto'
 
-    daemon('stop')
-    salvageAndReset()
-
-    const b = build()
-    if (b.ok) {
-      // Migrations + re-render + setupRecall (the actual upgrade). Non-interactive.
-      const boot = run('node ./template/bootstrap.js')
-      if (!boot.ok) b.ok = false
-    }
-    daemon('start')
-
-    const gate = await verifyGate(b.ok)
-    if (!gate.ok) {
-      rollback(snap)
-      daemon('start')
-      await telegram(`Nello auto-update was rolled back safely.\n\nReason: ${gate.why}.\nYou're still on your previous working version (v${oldVer || '?'}). Nothing was lost. We'll retry on the next cycle, or run /update by hand.`)
-      err(`update rolled back: ${gate.why}`)
-      process.exitCode = 1
-      return
-    }
-
-    // Success: write the post-update announcement (version delta, the one thing to do,
-    // the auto-fetch cost) straight to the owner's Telegram.
-    run('node ./template/bootstrap.js --announce')
-    log('update complete + verified')
+    if (wantApply) await apply(remote, oldVer)
+    else await notify(oldVer, newVer)
   } finally {
     releaseLock()
   }

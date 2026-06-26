@@ -17,9 +17,11 @@ message, and stops auto-fetch from quietly running up an OpenAI bill.
   manages, the update safely sets your edit aside, moves to the latest version, and if
   anything fails it rolls itself back to your last working version - nothing is lost. Your
   own skills and settings live in a private layer that every update preserves.
-- **Weekly auto-update (on by default).** Nello checks for and applies updates once a week
-  on its own, with the same rollback safety, and Telegrams you the result. Turn it off any
-  time by setting `enableAutoUpdate` to false.
+- **Weekly update check (on by default).** Once a week Nello checks whether a new version
+  is out and Telegrams you "update ready - reply /update" - one tap, and nothing happens to
+  your setup until you say so. Prefer fully hands-off? Set `enableAutoUpdate` to `"auto"`
+  and it applies on its own (with the same salvage + rollback safety). Set it to `false`
+  to switch the weekly check off.
 - **Update message on Telegram.** Every `/update` now finishes with a plain-English note:
   what changed, the one thing you need to do (usually nothing), and a reminder that your
   notes and memory are untouched.
@@ -48,8 +50,9 @@ message, and stops auto-fetch from quietly running up an OpenAI bill.
 - **Auto-fetch uses a little OpenAI credit.** Checking your email every ~20 minutes and
   filing it into memory costs a small amount. It stays on by default; run
   `nello autofetch off` any time to stop it.
-- **Weekly auto-update is on by default.** Nello updates itself once a week (with rollback
-  if anything fails). To stay fully manual, set `enableAutoUpdate` to false in your bundle.
+- **The weekly check only notifies, by default.** Nello tells you when an update is ready
+  and waits for you to run `/update`; it does not change anything on its own unless you opt
+  in with `enableAutoUpdate: "auto"`. Set it to `false` to switch the check off.
 
 [1.1.0]: https://github.com/Matthew-Lee-Nello/nello/releases/tag/v1.1.0
 
