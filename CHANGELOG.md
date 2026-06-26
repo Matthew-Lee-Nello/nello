@@ -13,6 +13,13 @@ onto the OpenAI memory when you `/update`, ends every update with a clear Telegr
 message, and stops auto-fetch from quietly running up an OpenAI bill.
 
 ### Added
+- **Self-healing updates.** Updates can no longer get stuck. If you'd changed a file Nello
+  manages, the update safely sets your edit aside, moves to the latest version, and if
+  anything fails it rolls itself back to your last working version - nothing is lost. Your
+  own skills and settings live in a private layer that every update preserves.
+- **Weekly auto-update (on by default).** Nello checks for and applies updates once a week
+  on its own, with the same rollback safety, and Telegrams you the result. Turn it off any
+  time by setting `enableAutoUpdate` to false.
 - **Update message on Telegram.** Every `/update` now finishes with a plain-English note:
   what changed, the one thing you need to do (usually nothing), and a reminder that your
   notes and memory are untouched.
@@ -41,6 +48,8 @@ message, and stops auto-fetch from quietly running up an OpenAI bill.
 - **Auto-fetch uses a little OpenAI credit.** Checking your email every ~20 minutes and
   filing it into memory costs a small amount. It stays on by default; run
   `nello autofetch off` any time to stop it.
+- **Weekly auto-update is on by default.** Nello updates itself once a week (with rollback
+  if anything fails). To stay fully manual, set `enableAutoUpdate` to false in your bundle.
 
 [1.1.0]: https://github.com/Matthew-Lee-Nello/nello/releases/tag/v1.1.0
 

@@ -694,6 +694,44 @@ function symlinkSkills() {
       warn(`couldn't link ${name}: ${err.message?.split('\n')[0] || 'unknown'}. Skill won't be discoverable until linked manually.`)
     }
   }
+
+  // Second pass: the client override layer. Skills the owner added or hand-edited live
+  // in client-overlay/skills/ (the self-update salvage moves edited shipped skills here),
+  // and they are linked LAST so an overlay skill wins by name over a shipped one. This is
+  // what makes customisation survive every hard-reset update - the overlay dir is
+  // gitignored, so the reset never touches it. Same realpath containment guard as above.
+  const overlaySrc = join(INSTALL_PATH, 'client-overlay', 'skills')
+  if (existsSync(overlaySrc)) {
+    let overlayRoot
+    try { overlayRoot = realpathSync(overlaySrc) } catch { overlayRoot = null }
+    if (overlayRoot) {
+      let overlaid = 0
+      for (const name of readdirSync(overlaySrc)) {
+        const srcPath = join(overlaySrc, name)
+        let realSrc
+        try { realSrc = realpathSync(srcPath) } catch { continue }
+        if (realSrc !== overlayRoot && !realSrc.startsWith(overlayRoot + sep)) {
+          warn(`overlay skill ${name}: resolves outside client-overlay/skills, skipping`)
+          continue
+        }
+        const destPath = join(dest, name)
+        if (existsSync(destPath)) {
+          try {
+            const stat = lstatSync(destPath)
+            if (stat.isSymbolicLink() || (process.platform === 'win32' && stat.isDirectory())) {
+              try { unlinkSync(destPath) } catch { try { renameSync(destPath, `${destPath}.bak-${Date.now()}`) } catch {} }
+            } else {
+              renameSync(destPath, `${destPath}.bak-${Date.now()}`)
+            }
+          } catch {}
+        }
+        try { symlinkSync(srcPath, destPath, linkType); overlaid++ }
+        catch (e) { warn(`couldn't link overlay skill ${name}: ${e.message?.split('\n')[0] || 'unknown'}`) }
+      }
+      if (overlaid > 0) ok(`linked ${overlaid} client-overlay skill(s) (override wins by name)`)
+    }
+  }
+
   ok(`linked ${linked} skills into ${dest}`)
 }
 
@@ -1477,6 +1515,22 @@ async function main() {
   if (bundle.installLaunchAgent) {
     info('Installing auto-start service')
     installService()
+  }
+
+  // Weekly unattended self-update timer (Phase C). Gated on enableAutoUpdate (default on)
+  // and only when the daemon service is installed (shares the same per-OS service infra).
+  // The timer runs template/scripts/self-update.js, which pull -> build -> migrate ->
+  // verify -> rolls back on any failure, so a bad week leaves the box on its prior
+  // working version. Best-effort: a failed timer never blocks the install; /update still
+  // works by hand.
+  if (bundle.installLaunchAgent && bundle.enableAutoUpdate !== false) {
+    info('Registering weekly auto-update timer')
+    try {
+      spawnSync('node', [join(TEMPLATE_DIR, 'scripts', 'install-service.js'), 'update-timer'], {
+        stdio: 'inherit',
+        env: { ...process.env, NC_INSTALL_PATH: INSTALL_PATH },
+      })
+    } catch (e) { warn(`auto-update timer registration skipped (${e.message?.split('\n')[0] || 'unknown'}); /update still works`) }
   }
 
   if (bundle.enableMorningBrief) {

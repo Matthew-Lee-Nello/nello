@@ -243,8 +243,150 @@ WantedBy=default.target
   }
 }
 
-const p = platform()
-if (p === 'darwin') installMac()
-else if (p === 'win32') installWindows()
-else if (p === 'linux') installLinux()
-else { fail(`unsupported platform: ${p}`); process.exit(1) }
+// ---------- daemon stop/start (centralised so self-update.js stays portable) ----------
+// self-update.js shells `node install-service.js stop|start` around its git surgery, so
+// the per-OS service commands live in exactly one place. Best-effort + idempotent.
+
+function macUid() { return process.getuid?.() ?? 501 }
+
+function stopDaemon() {
+  if (platform() === 'darwin') {
+    spawnSync('launchctl', ['bootout', `gui/${macUid()}/${LABEL}`], { stdio: 'ignore' })
+  } else if (platform() === 'win32') {
+    const pidFile = join(INSTALL, 'store', 'clawd.pid')
+    try {
+      if (existsSync(pidFile)) {
+        const pid = readFileSync(pidFile, 'utf-8').trim()
+        if (pid) spawnSync('taskkill', ['/PID', pid, '/F'], { stdio: 'ignore' })
+      }
+    } catch {}
+  } else {
+    spawnSync('systemctl', ['--user', 'stop', LABEL], { stdio: 'ignore' })
+  }
+  ok(`daemon stopped (${LABEL})`)
+}
+
+function startDaemon() {
+  if (platform() === 'darwin') {
+    const plist = join(homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`)
+    // bootstrap re-loads from the on-disk plist; if it's already loaded, kickstart it.
+    const r = spawnSync('launchctl', ['bootstrap', `gui/${macUid()}`, plist], { stdio: 'ignore' })
+    if (r.status !== 0) spawnSync('launchctl', ['kickstart', '-k', `gui/${macUid()}/${LABEL}`], { stdio: 'ignore' })
+  } else if (platform() === 'win32') {
+    const wrapper = join(INSTALL, 'nello-daemon.cmd')
+    if (existsSync(wrapper)) { try { spawn('cmd', ['/c', 'start', '/min', '""', wrapper], { detached: true, stdio: 'ignore' }).unref() } catch {} }
+  } else {
+    spawnSync('systemctl', ['--user', 'start', LABEL], { stdio: 'ignore' })
+  }
+  ok(`daemon started (${LABEL})`)
+}
+
+// ---------- weekly self-update timer (Phase C) ----------
+// A second scheduled job, label com.nello.update, that runs self-update.js headlessly
+// once a week. Mirrors the daemon-install pattern per OS. Idempotent.
+const UPDATE_LABEL = process.env.NC_UPDATE_LABEL || LABEL.replace(/\.server$/, '.update')
+const SELF_UPDATE = join(INSTALL, 'template', 'scripts', 'self-update.js')
+
+function installUpdateTimer() {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(UPDATE_LABEL)) {
+    fail(`Invalid update label: ${JSON.stringify(UPDATE_LABEL)}`); process.exit(1)
+  }
+  if (platform() === 'darwin') {
+    const dest = join(homedir(), 'Library', 'LaunchAgents', `${UPDATE_LABEL}.plist`)
+    mkdirSync(dirname(dest), { recursive: true })
+    const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${UPDATE_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${NODE}</string>
+        <string>${SELF_UPDATE}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>${INSTALL}</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>4</integer>
+        <key>Minute</key><integer>17</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>${INSTALL}/store/self-update.log</string>
+    <key>StandardErrorPath</key>
+    <string>${INSTALL}/store/self-update.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>${NODE_BIN}:${BUN_BIN}:/opt/homebrew/bin:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>${homedir()}</string>
+        <key>NC_INSTALL_PATH</key>
+        <string>${INSTALL}</string>
+    </dict>
+</dict>
+</plist>
+`
+    writeFileSync(dest, plist)
+    spawnSync('launchctl', ['bootout', `gui/${macUid()}/${UPDATE_LABEL}`], { stdio: 'ignore' })
+    const r = spawnSync('launchctl', ['bootstrap', `gui/${macUid()}`, dest], { stdio: 'pipe' })
+    if (r.status === 0) ok(`weekly auto-update timer registered (${UPDATE_LABEL}, Sun 04:17)`)
+    else fail(`auto-update timer load failed: ${r.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
+  } else if (platform() === 'win32') {
+    const wrapper = join(INSTALL, 'nello-update.cmd')
+    const logFile = join(INSTALL, 'store', 'self-update.log')
+    writeFileSync(wrapper,
+      `@echo off\r\n` +
+      `cd /d "${INSTALL}"\r\n` +
+      `set "PATH=${NODE_BIN};${BUN_BIN};%PATH%"\r\n` +
+      `"${NODE}" "${SELF_UPDATE}" >> "${logFile}" 2>&1\r\n`)
+    spawnSync('schtasks', ['/Delete', '/F', '/TN', UPDATE_LABEL], { stdio: 'ignore' })
+    const w = spawnSync('schtasks', ['/Create', '/F', '/TN', UPDATE_LABEL, '/TR', `"${wrapper}"`, '/SC', 'WEEKLY', '/D', 'SUN', '/ST', '04:17', '/RL', 'LIMITED'], { stdio: 'ignore' })
+    if (w.status === 0) ok(`weekly auto-update task registered (${UPDATE_LABEL})`)
+    else fail('auto-update task registration skipped (updates still available via /update)')
+  } else {
+    const svc = join(homedir(), '.config', 'systemd', 'user', `${UPDATE_LABEL}.service`)
+    const tim = join(homedir(), '.config', 'systemd', 'user', `${UPDATE_LABEL}.timer`)
+    mkdirSync(dirname(svc), { recursive: true })
+    writeFileSync(svc, `[Unit]
+Description=nello weekly self-update
+
+[Service]
+Type=oneshot
+ExecStart=${NODE} ${SELF_UPDATE}
+WorkingDirectory=${INSTALL}
+Environment=NC_INSTALL_PATH=${INSTALL}
+Environment=PATH=${NODE_BIN}:${BUN_BIN}:/usr/local/bin:${homedir()}/.local/bin:/usr/bin:/bin
+StandardOutput=append:${INSTALL}/store/self-update.log
+StandardError=append:${INSTALL}/store/self-update.log
+`)
+    writeFileSync(tim, `[Unit]
+Description=nello weekly self-update timer
+
+[Timer]
+OnCalendar=Sun *-*-* 04:17:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`)
+    spawnSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'ignore' })
+    const e = spawnSync('systemctl', ['--user', 'enable', '--now', `${UPDATE_LABEL}.timer`], { stdio: 'pipe' })
+    if (e.status === 0) ok(`weekly auto-update timer enabled (${UPDATE_LABEL}.timer)`)
+    else fail(`auto-update timer enable failed: ${e.stderr?.toString().split('\n')[0] || 'unknown'} (updates still available via /update)`)
+  }
+}
+
+const cmd = process.argv[2] || 'install'
+if (cmd === 'stop') stopDaemon()
+else if (cmd === 'start') startDaemon()
+else if (cmd === 'update-timer') installUpdateTimer()
+else {
+  const p = platform()
+  if (p === 'darwin') installMac()
+  else if (p === 'win32') installWindows()
+  else if (p === 'linux') installLinux()
+  else { fail(`unsupported platform: ${p}`); process.exit(1) }
+}

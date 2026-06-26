@@ -29,3 +29,8 @@ vault/
 /CLAUDE.md
 /AGENTS.md
 install.log
+# Client override layer + rollback snapshots (per-install state; the self-update
+# engine reads the overlay and writes rollback backups - never part of the product).
+client-overlay/
+.nello-rollback/
+.nello-version

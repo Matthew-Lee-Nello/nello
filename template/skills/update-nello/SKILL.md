@@ -13,7 +13,7 @@ One job: bring a clone up to the newest `main`, rebuild, re-render the configs/p
 
 - **Read `<install>/UPDATE_GUIDE.md` first** and follow its steps in order. That file is the source of truth; this is the map.
 - **Run every command from the install folder** - the one with `.env`, `bundle.json` and `template/`. Confirm that first (`pwd`, `ls -A`). If it is not an install folder, stop and ask the user to `cd` into theirs.
-- **Confirm before anything destructive.** Back up first. Never `git reset --hard` or `git stash -u` (that would sweep up the untracked `.env` and vault).
+- **Confirm before anything destructive.** Back up first. Never run a raw `git reset --hard` or `git stash -u` by hand (that would sweep up the untracked `.env` and vault). If a fast-forward pull is refused, use the safe engine (`self-update.js --salvage-reset`, see step 3) - it snapshots client state and salvages edits before it resets, so nothing is lost.
 - **Preserve everything personal.** `vault/`, `store/`, `bundle.json` answers and the Telegram owner lock all carry over. There is NO re-interview - only code, configs, skills and persona refresh.
 - **Adapt to the OS** (Mac / Windows / Linux) - the daemon start/stop commands differ; the guide lists each.
 - **If something looks wrong** (not a git clone, missing `bundle.json`), stop and tell the user. Don't guess.
@@ -22,7 +22,11 @@ One job: bring a clone up to the newest `main`, rebuild, re-render the configs/p
 
 1. **Locate + back up.** Confirm `.env`, `bundle.json`, `template/` are here. Timestamp-copy `.env`, `bundle.json` and `.mcp.json` (Step 0).
 2. **Stop the daemon** so nothing runs mid-update (Step 1, OS-specific).
-3. **Pull latest main, fast-forward only.** `git fetch origin` then `git pull --ff-only origin main`. Updates always pull the newest `main`. If the pull is refused by local edits, show `git status` and ask - never force (Step 2).
+3. **Pull latest main, fast-forward only.** `git fetch origin` then `git pull --ff-only origin main`. Updates always pull the newest `main`. **If the pull is refused** (a local edit to a tracked product file - the old chicken-and-egg that froze ancient installs), run the safe unstick instead of forcing:
+   ```bash
+   NC_INSTALL_PATH=$(pwd) node ./template/scripts/self-update.js --salvage-reset
+   ```
+   It checks the remote is really `Matthew-Lee-Nello/nello`, snapshots `.env`/`bundle.json`/`.mcp.json`/`.nello-version`, salvages your tracked-file edits into `client-overlay/quarantine/` (a client-edited shipped skill is also copied into `client-overlay/skills/` so it keeps working), then resets product files to `origin/main`. Client state (`.env`, vault, store) is gitignored, so it is never touched. Then continue with step 4.
 4. **Rebuild.** `pnpm install` then `pnpm -r build` (Step 3).
 5. **Refresh the install - this is where the upgrade happens** (Guide Step 4). Run the full bootstrap:
    ```bash
